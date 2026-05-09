@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+body {
+    font-family: 'Poppins', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body.modal-open {
+    overflow: hidden;
+}
+
+.dashboard-modal {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 180ms ease, visibility 180ms ease;
+}
+
+.dashboard-modal.is-open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.dashboard-modal-panel {
+    transform: translateY(12px) scale(0.97);
+    transition: transform 180ms ease, opacity 180ms ease;
+    opacity: 0;
+}
+
+.dashboard-modal.is-open .dashboard-modal-panel {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.font-bold,
+.font-semibold {
+    font-weight: 600 !important;
+}
+
+.calendar-day {
+    min-height: clamp(4.75rem, 12vw, 7.5rem);
+}

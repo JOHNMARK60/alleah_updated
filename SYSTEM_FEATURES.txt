@@ -1,0 +1,150 @@
+EVENTIFY SYSTEM FEATURES AND IMPROVEMENT GUIDE
+
+System Overview
+- Eventify is an event management and reservation system.
+- It supports public visitors, registered clients, and administrators.
+- The system handles account registration, login, event reservation requests, admin approvals, event calendars, and basic dashboard reporting.
+
+Main User Roles
+- Public Visitor: Can view the homepage, packages, and login/register modal.
+- Client: Can access the client dashboard, submit reservations, view booking status, check the event calendar, and cancel reservations.
+- Admin: Can access the admin dashboard, review reservation requests, approve or reject bookings, view users, manage calendar events, and manually add events.
+
+Homepage Features
+- Landing page for Eventify branding and event management promotion.
+- Feature section describing planning, analytics, and client management.
+- Package/pricing section with Basic, Standard, and Premium packages.
+- Login and registration modal directly from the homepage.
+- Mobile menu support for smaller screens.
+
+Authentication Features
+- User registration with full name, username, email, contact number, password, and confirm password.
+- Server-side validation for name, email, contact number, password length, and matching password confirmation.
+- Secure password hashing using PHP password_hash().
+- Login using email and password.
+- Role-based login redirection:
+  - Admin users go to admin/dashboard.php.
+  - Client users go to client/dashboard.php.
+- Logout destroys the session and returns users to the homepage.
+- Default admin account is automatically created:
+  - Email: admin@eventify.com
+  - Password: admin123
+
+Database Features
+- Automatically creates the registration_event database if it does not exist.
+- Automatically creates these tables:
+  - users
+  - reservations
+  - events
+- Seeds a default administrator account if no admin exists.
+- Uses MySQLi prepared statements in several insert and login flows.
+
+Client Features
+- Client dashboard with summary cards for:
+  - Total reservations
+  - Upcoming events
+  - Completed events
+- Recent reservation activity section.
+- Upcoming event highlight section.
+- New reservation form with:
+  - Event name
+  - Event type
+  - Event date
+  - Event time
+  - Venue
+  - Guest count
+  - Client name
+  - Client contact
+  - Package type
+  - Budget
+  - Service add-ons such as Catering, Sound, Decoration, and Lights
+- My Reservations page with:
+  - Upcoming and past reservation tabs
+  - Reservation cards
+  - Status badges
+  - Reservation detail modal
+  - Active bookings count
+  - Waitlisted count
+  - Total budget/spent summary
+  - Cancel reservation action
+- Client event calendar with:
+  - Monthly calendar navigation
+  - Today button
+  - Free/Full availability labels
+  - Approved event details by selected date
+- Responsive client navigation with desktop sidebar, mobile header, and mobile bottom navigation.
+
+Admin Features
+- Admin dashboard with summary cards for:
+  - Total reservations
+  - Total users
+  - Pending reservations
+  - Approved events
+- Recent reservations table.
+- Search field for recent reservations.
+- Reservations management page with:
+  - Reservation list
+  - Filters for all, pending, approved, rejected, and cancelled reservations
+  - Search field
+  - View details section
+  - Approve action
+  - Reject action
+- Approval workflow:
+  - Approving a reservation copies it into the events table.
+  - Approved reservations appear in the approved event calendar.
+  - Rejected reservations keep a Rejected status.
+- Users page with:
+  - User list
+  - ID, name, username, email, contact, and role columns
+  - Search field
+- Admin calendar with:
+  - Approved events
+  - Monthly navigation
+  - Today button
+  - Selected-date event details
+  - Upcoming and completed event counts
+- Add Event page where admins can manually create approved events.
+- Responsive admin sidebar and mobile navigation.
+
+Interface and Frontend Features
+- Uses Tailwind CSS from CDN for styling.
+- Uses custom CSS folders for homepage, auth, client, and admin pages.
+- Responsive layout for desktop and mobile screens.
+- Interactive JavaScript features include:
+  - Mobile menu toggle
+  - Login/register modal tabs
+  - Password show/hide toggle
+  - Table search
+  - Client calendar rendering
+  - Admin calendar rendering
+  - Reservation details modal
+  - Reservation upcoming/past tabs
+
+Current Improvement Opportunities
+- Link each reservation to the logged-in client user ID so clients only see their own reservations.
+- Add session/role checks to every client page, including reservation.php, my_reservations.php, calendar.php, and cancel.php.
+- Prevent clients from cancelling reservations that do not belong to them.
+- Add CSRF protection for approve, reject, cancel, login, registration, and reservation forms.
+- Replace approval/rejection GET actions with POST forms for safer state changes.
+- Add validation for reservation dates, times, budget, guest count, and required package/service choices.
+- Prevent double-booking by checking existing approved events for the same date, time, and venue.
+- Add edit reservation functionality instead of using the current Edit button as a shortcut to View Details.
+- Add delete or archive options for admin-managed events if needed.
+- Add clearer status history so users can see when a reservation was approved, rejected, or cancelled.
+- Add notification messages or email alerts for reservation approval, rejection, and cancellation.
+- Add pagination for reservations and users once records grow.
+- Add admin ability to manage package names, prices, and included services from the database.
+- Add stronger password requirements and optional password reset.
+- Hide or change the default admin credentials before deployment.
+- Move repeated Tailwind configuration and layout markup into reusable PHP includes.
+- Add database indexes for frequently searched columns such as email, status, event_date, and role.
+- Add reports for monthly reservations, revenue/budget totals, popular event types, and package usage.
+- Add automated tests or manual test checklist for login, registration, reservation, approval, rejection, cancellation, and calendar display.
+
+Suggested Priority Improvements
+- Priority 1: Protect client data by linking reservations to user accounts and filtering client pages by logged-in user.
+- Priority 2: Secure state-changing actions with POST requests and CSRF protection.
+- Priority 3: Add double-booking prevention for date, time, and venue.
+- Priority 4: Improve reservation editing, status tracking, and notifications.
+- Priority 5: Add reporting, package management, pagination, and reusable layout components.
+  

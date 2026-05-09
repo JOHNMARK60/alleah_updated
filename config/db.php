@@ -1,0 +1,383 @@
+<?php
+require_once __DIR__ . '/helpers.php';
+
+$host = "localhost";
+$username = "root";
+$password = "";
+$database = "registration_event";
+
+if(function_exists('mysqli_report')) {
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+}
+
+try {
+    $conn = new mysqli($host, $username, $password);
+    $conn->set_charset("utf8mb4");
+
+    // Create the project database automatically when it is missing.
+    $conn->query("CREATE DATABASE IF NOT EXISTS `$database` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
+    $conn->select_db($database);
+
+    // Users table for login and registration.
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            username VARCHAR(100) NOT NULL,
+            email VARCHAR(150) NOT NULL UNIQUE,
+            contact VARCHAR(30) NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            role VARCHAR(20) NOT NULL DEFAULT 'client',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    // Client reservation requests. Keep `guest` singular because the existing PHP uses that column.
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS reservations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT DEFAULT NULL,
+            booking_reference VARCHAR(32) DEFAULT NULL,
+            event_name VARCHAR(150) NOT NULL,
+            event_type VARCHAR(80) DEFAULT NULL,
+            event_date DATE NOT NULL,
+            event_time TIME NOT NULL,
+            end_time TIME DEFAULT NULL,
+            venue VARCHAR(150) DEFAULT NULL,
+            guest INT DEFAULT 0,
+            client_name VARCHAR(120) NOT NULL,
+            client_contact VARCHAR(50) DEFAULT NULL,
+            package_id INT DEFAULT NULL,
+            package_type VARCHAR(50) DEFAULT NULL,
+            budget DECIMAL(10,2) DEFAULT 0.00,
+            services TEXT DEFAULT NULL,
+            status VARCHAR(30) NOT NULL DEFAULT 'Pending',
+            approved_at DATETIME DEFAULT NULL,
+            rejected_at DATETIME DEFAULT NULL,
+            cancelled_at DATETIME DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    ");
+
+    // Approved/admin-created events. Keep `guests` plural because the existing admin PHP uses that column.
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS events (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            reservation_id INT DEFAULT NULL,
+            event_name VARCHAR(150) NOT NULL,
+            event_type VARCHAR(80) DEFAULT NULL,
+            event_date DATE NOT NULL,
+            event_time TIME NOT NULL,
+            end_time TIME DEFAULT NULL,
+            venue VARCHAR(150) DEFAULT NULL,
+            guests INT DEFAULT 0,
+            client_name VARCHAR(120) NOT NULL,
+            client_contact VARCHAR(50) DEFAULT NULL,
+            package_id INT DEFAULT NULL,
+            package_type VARCHAR(50) DEFAULT NULL,
+            budget DECIMAL(10,2) DEFAULT 0.00,
+            services TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NULL,
+            role ENUM('admin','client') NULL,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            is_read TINYINT(1) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS event_packages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(120) NOT NULL,
+            slug VARCHAR(140) NOT NULL UNIQUE,
+            description TEXT DEFAULT NULL,
+            price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            image_path VARCHAR(255) DEFAULT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            sort_order INT NOT NULL DEFAULT 0,
+            deleted_at DATETIME DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS package_features (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            package_id INT NOT NULL,
+            feature_text VARCHAR(255) NOT NULL,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_package_features_package_id (package_id),
+            CONSTRAINT fk_package_features_package
+                FOREIGN KEY (package_id) REFERENCES event_packages(id)
+                ON DELETE CASCADE
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS event_gallery_photos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            event_category VARCHAR(40) NOT NULL,
+            package_tier VARCHAR(40) NOT NULL,
+            title VARCHAR(150) NOT NULL,
+            image_path VARCHAR(255) NOT NULL,
+            sort_order INT NOT NULL DEFAULT 0,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_gallery_package (event_category, package_tier),
+            INDEX idx_gallery_active (is_active)
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS reservation_status_history (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            reservation_id INT NOT NULL,
+            old_status VARCHAR(30) DEFAULT NULL,
+            new_status VARCHAR(30) NOT NULL,
+            note TEXT DEFAULT NULL,
+            changed_by INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_reservation_status_history_reservation_id (reservation_id)
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS reservation_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            reservation_id INT NOT NULL,
+            package_id INT DEFAULT NULL,
+            item_name VARCHAR(150) NOT NULL,
+            quantity INT NOT NULL DEFAULT 1,
+            unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            total_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_reservation_items_reservation_id (reservation_id)
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS payments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            reservation_id INT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            method VARCHAR(60) DEFAULT NULL,
+            reference_number VARCHAR(120) DEFAULT NULL,
+            status VARCHAR(30) NOT NULL DEFAULT 'Unpaid',
+            paid_at DATETIME DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_payments_reservation_id (reservation_id),
+            INDEX idx_payments_status (status)
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS event_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            reservation_id INT DEFAULT NULL,
+            event_id INT DEFAULT NULL,
+            log_type VARCHAR(80) NOT NULL,
+            message TEXT NOT NULL,
+            created_by INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_event_logs_reservation_id (reservation_id),
+            INDEX idx_event_logs_event_id (event_id)
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS activity_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT DEFAULT NULL,
+            role VARCHAR(30) DEFAULT NULL,
+            action VARCHAR(120) NOT NULL,
+            details TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_activity_logs_user_id (user_id),
+            INDEX idx_activity_logs_action (action)
+        )
+    ");
+
+    upgrade_eventify_schema($conn);
+    seed_default_admin($conn);
+    seed_default_packages($conn);
+    sync_default_package_prices($conn);
+} catch (mysqli_sql_exception $error) {
+    die("Database setup failed: " . $error->getMessage());
+}
+
+function upgrade_eventify_schema($conn) {
+    eventify_ensure_column($conn, 'reservations', 'user_id', 'INT DEFAULT NULL AFTER id');
+    eventify_ensure_column($conn, 'reservations', 'booking_reference', 'VARCHAR(32) DEFAULT NULL AFTER user_id');
+    eventify_ensure_column($conn, 'reservations', 'end_time', 'TIME DEFAULT NULL AFTER event_time');
+    eventify_ensure_column($conn, 'reservations', 'package_id', 'INT DEFAULT NULL AFTER client_contact');
+    eventify_ensure_column($conn, 'reservations', 'approved_at', 'DATETIME DEFAULT NULL AFTER status');
+    eventify_ensure_column($conn, 'reservations', 'rejected_at', 'DATETIME DEFAULT NULL AFTER approved_at');
+    eventify_ensure_column($conn, 'reservations', 'cancelled_at', 'DATETIME DEFAULT NULL AFTER rejected_at');
+    eventify_ensure_column($conn, 'reservations', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at');
+
+    eventify_ensure_column($conn, 'events', 'reservation_id', 'INT DEFAULT NULL AFTER id');
+    eventify_ensure_column($conn, 'events', 'end_time', 'TIME DEFAULT NULL AFTER event_time');
+    eventify_ensure_column($conn, 'events', 'package_id', 'INT DEFAULT NULL AFTER client_contact');
+    eventify_ensure_varchar_length($conn, 'reservations', 'package_type', 120);
+    eventify_ensure_varchar_length($conn, 'events', 'package_type', 120);
+
+    eventify_ensure_column_index($conn, 'users', 'email', 'idx_users_email');
+    eventify_ensure_column_index($conn, 'users', 'role', 'idx_users_role');
+    eventify_ensure_column_index($conn, 'reservations', 'booking_reference', 'idx_reservations_booking_reference');
+    eventify_ensure_column_index($conn, 'reservations', 'package_id', 'idx_reservations_package_id');
+    eventify_ensure_column_index($conn, 'reservations', 'status', 'idx_reservations_status');
+    eventify_ensure_column_index($conn, 'reservations', 'event_date', 'idx_reservations_event_date');
+    eventify_ensure_column_index($conn, 'reservations', 'user_id', 'idx_reservations_user_id');
+    eventify_ensure_column_index($conn, 'events', 'package_id', 'idx_events_package_id');
+    eventify_ensure_column_index($conn, 'events', 'event_date', 'idx_events_event_date');
+    eventify_ensure_column_index($conn, 'notifications', 'user_id', 'idx_notifications_user_id');
+    eventify_ensure_column_index($conn, 'notifications', 'role', 'idx_notifications_role');
+    eventify_ensure_column_index($conn, 'notifications', 'is_read', 'idx_notifications_is_read');
+    eventify_ensure_column_index($conn, 'event_gallery_photos', 'is_active', 'idx_gallery_active');
+}
+
+function seed_default_admin($conn) {
+    $result = $conn->query("SELECT COUNT(*) AS total FROM users WHERE role='admin'");
+    $admin_count = $result->fetch_assoc()['total'];
+
+    if((int) $admin_count > 0) {
+        return;
+    }
+
+    $name = "System Admin";
+    $username = "admin";
+    $email = "admin@eventify.com";
+    $contact = "0000000000";
+    $role = "admin";
+    $hashed = password_hash("admin123", PASSWORD_DEFAULT);
+
+    $stmt = $conn->prepare("INSERT INTO users(name, username, email, contact, password, role) VALUES(?,?,?,?,?,?)");
+    $stmt->bind_param("ssssss", $name, $username, $email, $contact, $hashed, $role);
+    $stmt->execute();
+}
+
+function seed_default_packages($conn) {
+    $result = $conn->query("SELECT COUNT(*) AS total FROM event_packages WHERE deleted_at IS NULL");
+    $package_count = (int) $result->fetch_assoc()['total'];
+
+    if ($package_count > 0) {
+        return;
+    }
+
+    $packages = [
+        [
+            'name' => 'Basic',
+            'slug' => 'basic',
+            'description' => 'Simple decoration, good for small events.',
+            'price' => 5000.00,
+            'sort_order' => 1,
+            'features' => ['Simple decoration', 'Good for small events', 'Basic event setup'],
+        ],
+        [
+            'name' => 'Standard',
+            'slug' => 'standard',
+            'description' => 'Enhanced decoration with sound system.',
+            'price' => 10000.00,
+            'sort_order' => 2,
+            'features' => ['Enhanced decoration', 'Includes sound system', 'Standard event setup'],
+        ],
+        [
+            'name' => 'Premium',
+            'slug' => 'premium',
+            'description' => 'Full decoration setup with photo and video package.',
+            'price' => 20000.00,
+            'sort_order' => 3,
+            'features' => ['Full decoration setup', 'Photo and video package', 'Premium event setup'],
+        ],
+    ];
+
+    $stmt = $conn->prepare("
+        INSERT INTO event_packages (name, slug, description, price, is_active, sort_order)
+        VALUES (?, ?, ?, ?, 1, ?)
+    ");
+    $feature_stmt = $conn->prepare("
+        INSERT INTO package_features (package_id, feature_text, sort_order)
+        VALUES (?, ?, ?)
+    ");
+
+    foreach ($packages as $package) {
+        $stmt->bind_param(
+            "sssdi",
+            $package['name'],
+            $package['slug'],
+            $package['description'],
+            $package['price'],
+            $package['sort_order']
+        );
+        $stmt->execute();
+        $package_id = $conn->insert_id;
+
+        foreach ($package['features'] as $index => $feature) {
+            $order = $index + 1;
+            $feature_stmt->bind_param("isi", $package_id, $feature, $order);
+            $feature_stmt->execute();
+        }
+    }
+}
+
+function sync_default_package_prices($conn) {
+    $packages = [
+        'basic' => [
+            'description' => 'Simple decoration, good for small events.',
+            'price' => 5000.00,
+            'features' => ['Simple decoration', 'Good for small events', 'Basic event setup'],
+        ],
+        'standard' => [
+            'description' => 'Enhanced decoration with sound system.',
+            'price' => 10000.00,
+            'features' => ['Enhanced decoration', 'Includes sound system', 'Standard event setup'],
+        ],
+        'premium' => [
+            'description' => 'Full decoration setup with photo and video package.',
+            'price' => 20000.00,
+            'features' => ['Full decoration setup', 'Photo and video package', 'Premium event setup'],
+        ],
+    ];
+
+    $select_stmt = $conn->prepare("SELECT id FROM event_packages WHERE slug=? AND deleted_at IS NULL LIMIT 1");
+    $update_stmt = $conn->prepare("UPDATE event_packages SET description=?, price=? WHERE id=?");
+    $delete_stmt = $conn->prepare("DELETE FROM package_features WHERE package_id=?");
+    $feature_stmt = $conn->prepare("INSERT INTO package_features (package_id, feature_text, sort_order) VALUES (?, ?, ?)");
+
+    foreach ($packages as $slug => $package) {
+        $select_stmt->bind_param("s", $slug);
+        $select_stmt->execute();
+        $row = $select_stmt->get_result()->fetch_assoc();
+
+        if (!$row) {
+            continue;
+        }
+
+        $package_id = (int) $row['id'];
+        $update_stmt->bind_param("sdi", $package['description'], $package['price'], $package_id);
+        $update_stmt->execute();
+
+        $delete_stmt->bind_param("i", $package_id);
+        $delete_stmt->execute();
+
+        foreach ($package['features'] as $index => $feature) {
+            $order = $index + 1;
+            $feature_stmt->bind_param("isi", $package_id, $feature, $order);
+            $feature_stmt->execute();
+        }
+    }
+}
+?>
