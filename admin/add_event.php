@@ -44,6 +44,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         );
 
         if($stmt->execute()){
+            eventify_sync_event_services($conn, (int) $conn->insert_id, $payload['services']);
             eventify_set_flash('success', 'Event added', 'The event was saved successfully.');
             header("Location: add_event.php");
             exit();

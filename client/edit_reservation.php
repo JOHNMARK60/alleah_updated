@@ -70,6 +70,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute();
 
         if($stmt->affected_rows >= 0) {
+            eventify_sync_reservation_services($conn, $id, $payload['services']);
             eventify_log_activity($conn, 'reservation.updated', 'Reservation #' . $id);
             eventify_prepare_email_notification('admin@eventify.com', 'Reservation edited', 'A client updated a pending Eventify reservation.');
             eventify_set_flash('success', 'Reservation updated', 'Your pending reservation was saved.');

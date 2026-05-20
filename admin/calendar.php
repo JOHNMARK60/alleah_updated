@@ -70,6 +70,7 @@ $completed = $conn->query("SELECT COUNT(*) as total FROM events WHERE event_date
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <?php echo eventify_notification_widget($conn, 'admin'); ?>
+                        <a href="event_records.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Event Records</a>
                         <a href="add_event.php" class="rounded-2xl bg-gradient-to-r from-primary to-secondary px-5 py-3 text-center font-semibold text-white shadow-soft">+ Add Event</a>
                     </div>
                 </div>

@@ -211,14 +211,19 @@ if (adminCalendarGrid && adminCalendarMonth) {
             return;
         }
 
-        adminSelectedDateEvents.innerHTML = selectedEvents.map((event) => `
-            <article class="rounded-2xl border border-purple-100 bg-indigo-50 p-5">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-primary">${escapeHtml(event.event_type || "Event")}</p>
-                <h3 class="mt-2 text-xl font-semibold">${escapeHtml(event.event_name || "Untitled Event")}</h3>
-                <p class="mt-2 text-sm text-slate-600">${escapeHtml(event.event_time || "")} | ${escapeHtml(event.venue || "Venue TBA")}</p>
-                <p class="mt-1 text-sm text-slate-600">Client: ${escapeHtml(event.client_name || "Not specified")}</p>
-            </article>
-        `).join("");
+        adminSelectedDateEvents.innerHTML = selectedEvents.map((event) => {
+            const eventId = Number(event.id || 0);
+
+            return `
+                <article class="rounded-2xl border border-purple-100 bg-indigo-50 p-5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-primary">${escapeHtml(event.event_type || "Event")}</p>
+                    <h3 class="mt-2 text-xl font-semibold">${escapeHtml(event.event_name || "Untitled Event")}</h3>
+                    <p class="mt-2 text-sm text-slate-600">${escapeHtml(event.event_time || "")} | ${escapeHtml(event.venue || "Venue TBA")}</p>
+                    <p class="mt-1 text-sm text-slate-600">Client: ${escapeHtml(event.client_name || "Not specified")}</p>
+                    ${eventId ? `<a href="event_records.php?event_id=${eventId}" class="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-primary hover:bg-purple-50">Records</a>` : ""}
+                </article>
+            `;
+        }).join("");
     }
 }
 

@@ -136,6 +136,8 @@ function admin_badge_class($status) {
                         <?php echo eventify_notification_widget($conn, 'admin'); ?>
                         <input type="search" data-table-search data-table-target="recentReservations" placeholder="Search recent reservations" class="rounded-2xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
                         <a href="reservations.php?filter=pending" class="rounded-2xl bg-gradient-to-r from-primary to-secondary px-5 py-3 text-center font-semibold text-white shadow-soft">Review Pending</a>
+                        <a href="payments.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Payments</a>
+                        <a href="event_records.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Event Records</a>
                     </div>
                 </div>
 

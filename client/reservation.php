@@ -53,6 +53,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         );
 
         if($stmt->execute()){
+            $reservation_id = (int) $conn->insert_id;
+            eventify_sync_reservation_services($conn, $reservation_id, $payload['services']);
             eventify_create_notification(
                 $conn,
                 null,
@@ -60,7 +62,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                 'New reservation request',
                 'New reservation request from ' . $payload['client_name'] . ' for ' . $payload['event_type'] . '.'
             );
-            eventify_record_status_history($conn, $conn->insert_id, null, 'Pending', 'Reservation submitted by client.');
+            eventify_record_status_history($conn, $reservation_id, null, 'Pending', 'Reservation submitted by client.');
             eventify_log_activity($conn, 'reservation.created', 'Reference ' . $booking_reference);
             eventify_prepare_email_notification('admin@eventify.com', 'New reservation submitted', 'A client submitted a new Eventify reservation for review.');
             eventify_set_flash('success', 'Reservation submitted', 'Waiting for admin approval.');

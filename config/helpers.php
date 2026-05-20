@@ -1,5 +1,5 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
+if (PHP_SAPI !== 'cli' && session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
@@ -475,6 +475,92 @@ function eventify_clean_services($services) {
     return implode(',', $clean);
 }
 
+function eventify_service_names_from_value($services) {
+    $clean = eventify_clean_services($services);
+
+    if ($clean === '') {
+        return [];
+    }
+
+    return array_values(array_filter(array_map('trim', explode(',', $clean))));
+}
+
+function eventify_service_option_id($conn, $service_name) {
+    $service_name = trim((string) $service_name);
+
+    if ($service_name === '') {
+        return 0;
+    }
+
+    $stmt = $conn->prepare("SELECT id FROM service_options WHERE name=? LIMIT 1");
+    $stmt->bind_param("s", $service_name);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+
+    if ($row) {
+        return (int) $row['id'];
+    }
+
+    $sort_order = 99;
+    $stmt = $conn->prepare("INSERT INTO service_options (name, sort_order) VALUES (?, ?)");
+    $stmt->bind_param("si", $service_name, $sort_order);
+    $stmt->execute();
+
+    return (int) $conn->insert_id;
+}
+
+function eventify_sync_reservation_services($conn, $reservation_id, $services) {
+    $reservation_id = (int) $reservation_id;
+
+    if ($reservation_id <= 0) {
+        return;
+    }
+
+    $stmt = $conn->prepare("DELETE FROM reservation_services WHERE reservation_id=?");
+    $stmt->bind_param("i", $reservation_id);
+    $stmt->execute();
+
+    $stmt = $conn->prepare("
+        INSERT IGNORE INTO reservation_services (reservation_id, service_id)
+        VALUES (?, ?)
+    ");
+
+    foreach (eventify_service_names_from_value($services) as $service_name) {
+        $service_id = eventify_service_option_id($conn, $service_name);
+
+        if ($service_id > 0) {
+            $stmt->bind_param("ii", $reservation_id, $service_id);
+            $stmt->execute();
+        }
+    }
+}
+
+function eventify_sync_event_services($conn, $event_id, $services) {
+    $event_id = (int) $event_id;
+
+    if ($event_id <= 0) {
+        return;
+    }
+
+    $stmt = $conn->prepare("DELETE FROM event_services WHERE event_id=?");
+    $stmt->bind_param("i", $event_id);
+    $stmt->execute();
+
+    $stmt = $conn->prepare("
+        INSERT IGNORE INTO event_services (event_id, service_id)
+        VALUES (?, ?)
+    ");
+
+    foreach (eventify_service_names_from_value($services) as $service_name) {
+        $service_id = eventify_service_option_id($conn, $service_name);
+
+        if ($service_id > 0) {
+            $stmt->bind_param("ii", $event_id, $service_id);
+            $stmt->execute();
+        }
+    }
+}
+
 function eventify_validate_reservation_data($conn, $data) {
     $errors = [];
     $today = date('Y-m-d');
@@ -646,6 +732,81 @@ function eventify_log_activity($conn, $action, $details = '') {
     $stmt->execute();
 }
 
+function eventify_payment_methods() {
+    return ['Cash', 'GCash', 'Bank Transfer', 'Card', 'Other'];
+}
+
+function eventify_payment_status_class($status) {
+    $status = strtolower((string) $status);
+
+    if ($status === 'paid' || $status === 'verified') {
+        return 'bg-emerald-100 text-emerald-700';
+    }
+
+    if ($status === 'partial paid') {
+        return 'bg-sky-100 text-sky-700';
+    }
+
+    if ($status === 'for review') {
+        return 'bg-amber-100 text-amber-700';
+    }
+
+    if ($status === 'rejected') {
+        return 'bg-red-100 text-red-700';
+    }
+
+    return 'bg-slate-200 text-slate-600';
+}
+
+function eventify_reservation_payment_summary($conn, $reservation_id, $budget = 0) {
+    $reservation_id = (int) $reservation_id;
+    $budget = max(0, (float) $budget);
+
+    $stmt = $conn->prepare("
+        SELECT
+            COALESCE(SUM(CASE WHEN status='Verified' THEN amount ELSE 0 END), 0) AS verified_amount,
+            COALESCE(SUM(CASE WHEN status='For Review' THEN amount ELSE 0 END), 0) AS review_amount,
+            COALESCE(SUM(CASE WHEN status='Rejected' THEN amount ELSE 0 END), 0) AS rejected_amount,
+            COUNT(*) AS payment_count,
+            MAX(created_at) AS latest_payment_at
+        FROM payments
+        WHERE reservation_id=?
+    ");
+    $stmt->bind_param("i", $reservation_id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc() ?: [];
+
+    $verified = (float) ($row['verified_amount'] ?? 0);
+    $review = (float) ($row['review_amount'] ?? 0);
+    $rejected = (float) ($row['rejected_amount'] ?? 0);
+    $payment_count = (int) ($row['payment_count'] ?? 0);
+    $balance = max($budget - $verified, 0);
+    $payable = max($budget - $verified - $review, 0);
+
+    if ($budget > 0 && $verified >= $budget) {
+        $label = 'Paid';
+    } elseif ($verified > 0) {
+        $label = 'Partial Paid';
+    } elseif ($review > 0) {
+        $label = 'For Review';
+    } elseif ($payment_count > 0 && $rejected > 0) {
+        $label = 'Rejected';
+    } else {
+        $label = 'Unpaid';
+    }
+
+    return [
+        'verified_amount' => $verified,
+        'review_amount' => $review,
+        'rejected_amount' => $rejected,
+        'payment_count' => $payment_count,
+        'latest_payment_at' => $row['latest_payment_at'] ?? null,
+        'balance_amount' => $balance,
+        'payable_amount' => $payable,
+        'label' => $label,
+    ];
+}
+
 function eventify_package_price_script($conn) {
     $packages = eventify_get_active_packages($conn);
     $prices = [];
@@ -705,6 +866,47 @@ function eventify_column_has_index($conn, $table, $column) {
 function eventify_ensure_column_index($conn, $table, $column, $index_name) {
     if (!eventify_column_has_index($conn, $table, $column)) {
         $conn->query("ALTER TABLE `$table` ADD INDEX `$index_name` (`$column`)");
+    }
+}
+
+function eventify_index_exists($conn, $table, $index_name) {
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND INDEX_NAME = ?
+    ");
+    $stmt->bind_param("ss", $table, $index_name);
+    $stmt->execute();
+
+    return (int) $stmt->get_result()->fetch_assoc()['total'] > 0;
+}
+
+function eventify_ensure_unique_column_index($conn, $table, $column, $index_name) {
+    if (!eventify_index_exists($conn, $table, $index_name)) {
+        $conn->query("ALTER TABLE `$table` ADD UNIQUE INDEX `$index_name` (`$column`)");
+    }
+}
+
+function eventify_foreign_key_exists($conn, $table, $constraint_name) {
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) AS total
+        FROM information_schema.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND CONSTRAINT_NAME = ?
+          AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+    ");
+    $stmt->bind_param("ss", $table, $constraint_name);
+    $stmt->execute();
+
+    return (int) $stmt->get_result()->fetch_assoc()['total'] > 0;
+}
+
+function eventify_ensure_foreign_key($conn, $table, $constraint_name, $definition) {
+    if (!eventify_foreign_key_exists($conn, $table, $constraint_name)) {
+        $conn->query("ALTER TABLE `$table` ADD CONSTRAINT `$constraint_name` $definition");
     }
 }
 

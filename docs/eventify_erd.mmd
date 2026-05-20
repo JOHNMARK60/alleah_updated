@@ -1,0 +1,194 @@
+erDiagram
+    USERS ||--o{ RESERVATIONS : creates
+    USERS ||--o{ NOTIFICATIONS : receives
+    USERS ||--o{ ACTIVITY_LOGS : performs
+    USERS ||--o{ EVENT_LOGS : records
+
+    EVENT_PACKAGES ||--o{ PACKAGE_FEATURES : has
+    EVENT_PACKAGES ||--o{ RESERVATIONS : selected_for
+    EVENT_PACKAGES ||--o{ EVENTS : used_for
+    EVENT_PACKAGES ||--o{ RESERVATION_ITEMS : priced_by
+
+    RESERVATIONS ||--o| EVENTS : becomes
+    RESERVATIONS ||--o{ PAYMENTS : has
+    RESERVATIONS ||--o{ RESERVATION_STATUS_HISTORY : tracks
+    RESERVATIONS ||--o{ RESERVATION_ITEMS : contains
+    RESERVATIONS ||--o{ RESERVATION_SERVICES : includes
+    SERVICE_OPTIONS ||--o{ RESERVATION_SERVICES : selected
+
+    EVENTS ||--o{ EVENT_SERVICES : includes
+    SERVICE_OPTIONS ||--o{ EVENT_SERVICES : selected
+    EVENTS ||--o{ EVENT_LOGS : has
+    RESERVATIONS ||--o{ EVENT_LOGS : references
+
+    USERS {
+        int id PK
+        varchar name
+        varchar username
+        varchar email UK
+        varchar contact
+        varchar password
+        varchar role
+        timestamp created_at
+    }
+
+    EVENT_PACKAGES {
+        int id PK
+        varchar name
+        varchar slug UK
+        text description
+        decimal price
+        varchar image_path
+        tinyint is_active
+        int sort_order
+        datetime deleted_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    PACKAGE_FEATURES {
+        int id PK
+        int package_id FK
+        varchar feature_text
+        int sort_order
+        timestamp created_at
+    }
+
+    RESERVATIONS {
+        int id PK
+        int user_id FK
+        varchar booking_reference
+        varchar event_name
+        varchar event_type
+        date event_date
+        time event_time
+        time end_time
+        varchar venue
+        int guest
+        varchar client_name
+        varchar client_contact
+        int package_id FK
+        varchar package_type
+        decimal budget
+        text services
+        varchar status
+        datetime approved_at
+        datetime rejected_at
+        datetime cancelled_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    EVENTS {
+        int id PK
+        int reservation_id FK
+        varchar event_name
+        varchar event_type
+        date event_date
+        time event_time
+        time end_time
+        varchar venue
+        int guests
+        varchar client_name
+        varchar client_contact
+        int package_id FK
+        varchar package_type
+        decimal budget
+        text services
+        timestamp created_at
+    }
+
+    SERVICE_OPTIONS {
+        int id PK
+        varchar name UK
+        varchar description
+        tinyint is_active
+        int sort_order
+        timestamp created_at
+    }
+
+    RESERVATION_SERVICES {
+        int reservation_id PK
+        int service_id PK
+        timestamp created_at
+    }
+
+    EVENT_SERVICES {
+        int event_id PK
+        int service_id PK
+        timestamp created_at
+    }
+
+    PAYMENTS {
+        int id PK
+        int reservation_id FK
+        decimal amount
+        varchar method
+        varchar reference_number
+        varchar status
+        datetime paid_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    RESERVATION_STATUS_HISTORY {
+        int id PK
+        int reservation_id FK
+        varchar old_status
+        varchar new_status
+        text note
+        int changed_by FK
+        timestamp created_at
+    }
+
+    EVENT_LOGS {
+        int id PK
+        int reservation_id FK
+        int event_id FK
+        varchar log_type
+        text message
+        int created_by FK
+        timestamp created_at
+    }
+
+    NOTIFICATIONS {
+        int id PK
+        int user_id FK
+        enum role
+        varchar title
+        text message
+        tinyint is_read
+        timestamp created_at
+    }
+
+    ACTIVITY_LOGS {
+        int id PK
+        int user_id FK
+        varchar role
+        varchar action
+        text details
+        timestamp created_at
+    }
+
+    RESERVATION_ITEMS {
+        int id PK
+        int reservation_id FK
+        int package_id FK
+        varchar item_name
+        int quantity
+        decimal unit_price
+        decimal total_price
+        timestamp created_at
+    }
+
+    EVENT_GALLERY_PHOTOS {
+        int id PK
+        varchar event_category
+        varchar package_tier
+        varchar title
+        varchar image_path
+        int sort_order
+        tinyint is_active
+        timestamp created_at
+        timestamp updated_at
+    }

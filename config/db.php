@@ -141,6 +141,49 @@ try {
     ");
 
     $conn->query("
+        CREATE TABLE IF NOT EXISTS service_options (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(80) NOT NULL UNIQUE,
+            description VARCHAR(255) DEFAULT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS reservation_services (
+            reservation_id INT NOT NULL,
+            service_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (reservation_id, service_id),
+            INDEX idx_reservation_services_service_id (service_id),
+            CONSTRAINT fk_reservation_services_reservation
+                FOREIGN KEY (reservation_id) REFERENCES reservations(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_reservation_services_service
+                FOREIGN KEY (service_id) REFERENCES service_options(id)
+                ON DELETE RESTRICT
+        )
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS event_services (
+            event_id INT NOT NULL,
+            service_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (event_id, service_id),
+            INDEX idx_event_services_service_id (service_id),
+            CONSTRAINT fk_event_services_event
+                FOREIGN KEY (event_id) REFERENCES events(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_event_services_service
+                FOREIGN KEY (service_id) REFERENCES service_options(id)
+                ON DELETE RESTRICT
+        )
+    ");
+
+    $conn->query("
         CREATE TABLE IF NOT EXISTS reservation_status_history (
             id INT AUTO_INCREMENT PRIMARY KEY,
             reservation_id INT NOT NULL,
@@ -214,6 +257,8 @@ try {
     seed_default_admin($conn);
     seed_default_packages($conn);
     sync_default_package_prices($conn);
+    seed_default_services($conn);
+    sync_normalized_services($conn);
 } catch (mysqli_sql_exception $error) {
     die("Database setup failed: " . $error->getMessage());
 }
@@ -241,12 +286,55 @@ function upgrade_eventify_schema($conn) {
     eventify_ensure_column_index($conn, 'reservations', 'status', 'idx_reservations_status');
     eventify_ensure_column_index($conn, 'reservations', 'event_date', 'idx_reservations_event_date');
     eventify_ensure_column_index($conn, 'reservations', 'user_id', 'idx_reservations_user_id');
+    eventify_ensure_column_index($conn, 'events', 'reservation_id', 'idx_events_reservation_id');
     eventify_ensure_column_index($conn, 'events', 'package_id', 'idx_events_package_id');
     eventify_ensure_column_index($conn, 'events', 'event_date', 'idx_events_event_date');
     eventify_ensure_column_index($conn, 'notifications', 'user_id', 'idx_notifications_user_id');
     eventify_ensure_column_index($conn, 'notifications', 'role', 'idx_notifications_role');
     eventify_ensure_column_index($conn, 'notifications', 'is_read', 'idx_notifications_is_read');
     eventify_ensure_column_index($conn, 'event_gallery_photos', 'is_active', 'idx_gallery_active');
+    eventify_ensure_column_index($conn, 'reservation_status_history', 'changed_by', 'idx_status_history_changed_by');
+    eventify_ensure_column_index($conn, 'reservation_items', 'package_id', 'idx_reservation_items_package_id');
+    eventify_ensure_column_index($conn, 'event_logs', 'created_by', 'idx_event_logs_created_by');
+    eventify_ensure_column_index($conn, 'activity_logs', 'user_id', 'idx_activity_logs_user_id');
+
+    prepare_eventify_foreign_key_data($conn);
+
+    eventify_ensure_foreign_key($conn, 'reservations', 'fk_reservations_user', 'FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'reservations', 'fk_reservations_package', 'FOREIGN KEY (`package_id`) REFERENCES `event_packages`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'events', 'fk_events_reservation', 'FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'events', 'fk_events_package', 'FOREIGN KEY (`package_id`) REFERENCES `event_packages`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'notifications', 'fk_notifications_user', 'FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'reservation_status_history', 'fk_status_history_reservation', 'FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`id`) ON DELETE CASCADE');
+    eventify_ensure_foreign_key($conn, 'reservation_status_history', 'fk_status_history_changed_by', 'FOREIGN KEY (`changed_by`) REFERENCES `users`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'reservation_items', 'fk_reservation_items_reservation', 'FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`id`) ON DELETE CASCADE');
+    eventify_ensure_foreign_key($conn, 'reservation_items', 'fk_reservation_items_package', 'FOREIGN KEY (`package_id`) REFERENCES `event_packages`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'payments', 'fk_payments_reservation', 'FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`id`) ON DELETE CASCADE');
+    eventify_ensure_foreign_key($conn, 'event_logs', 'fk_event_logs_reservation', 'FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'event_logs', 'fk_event_logs_event', 'FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'event_logs', 'fk_event_logs_created_by', 'FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'activity_logs', 'fk_activity_logs_user', 'FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'reservation_services', 'fk_reservation_services_reservation', 'FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`id`) ON DELETE CASCADE');
+    eventify_ensure_foreign_key($conn, 'reservation_services', 'fk_reservation_services_service', 'FOREIGN KEY (`service_id`) REFERENCES `service_options`(`id`) ON DELETE RESTRICT');
+    eventify_ensure_foreign_key($conn, 'event_services', 'fk_event_services_event', 'FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON DELETE CASCADE');
+    eventify_ensure_foreign_key($conn, 'event_services', 'fk_event_services_service', 'FOREIGN KEY (`service_id`) REFERENCES `service_options`(`id`) ON DELETE RESTRICT');
+}
+
+function prepare_eventify_foreign_key_data($conn) {
+    $conn->query("UPDATE reservations r LEFT JOIN users u ON u.id = r.user_id SET r.user_id = NULL WHERE r.user_id IS NOT NULL AND u.id IS NULL");
+    $conn->query("UPDATE reservations r LEFT JOIN event_packages p ON p.id = r.package_id SET r.package_id = NULL WHERE r.package_id IS NOT NULL AND p.id IS NULL");
+    $conn->query("UPDATE events e LEFT JOIN reservations r ON r.id = e.reservation_id SET e.reservation_id = NULL WHERE e.reservation_id IS NOT NULL AND r.id IS NULL");
+    $conn->query("UPDATE events e LEFT JOIN event_packages p ON p.id = e.package_id SET e.package_id = NULL WHERE e.package_id IS NOT NULL AND p.id IS NULL");
+    $conn->query("UPDATE notifications n LEFT JOIN users u ON u.id = n.user_id SET n.user_id = NULL WHERE n.user_id IS NOT NULL AND u.id IS NULL");
+    $conn->query("DELETE h FROM reservation_status_history h LEFT JOIN reservations r ON r.id = h.reservation_id WHERE r.id IS NULL");
+    $conn->query("UPDATE reservation_status_history h LEFT JOIN users u ON u.id = h.changed_by SET h.changed_by = NULL WHERE h.changed_by IS NOT NULL AND u.id IS NULL");
+    $conn->query("DELETE i FROM reservation_items i LEFT JOIN reservations r ON r.id = i.reservation_id WHERE r.id IS NULL");
+    $conn->query("UPDATE reservation_items i LEFT JOIN event_packages p ON p.id = i.package_id SET i.package_id = NULL WHERE i.package_id IS NOT NULL AND p.id IS NULL");
+    $conn->query("DELETE p FROM payments p LEFT JOIN reservations r ON r.id = p.reservation_id WHERE r.id IS NULL");
+    $conn->query("UPDATE event_logs l LEFT JOIN reservations r ON r.id = l.reservation_id SET l.reservation_id = NULL WHERE l.reservation_id IS NOT NULL AND r.id IS NULL");
+    $conn->query("UPDATE event_logs l LEFT JOIN events e ON e.id = l.event_id SET l.event_id = NULL WHERE l.event_id IS NOT NULL AND e.id IS NULL");
+    $conn->query("UPDATE event_logs l LEFT JOIN users u ON u.id = l.created_by SET l.created_by = NULL WHERE l.created_by IS NOT NULL AND u.id IS NULL");
+    $conn->query("UPDATE activity_logs a LEFT JOIN users u ON u.id = a.user_id SET a.user_id = NULL WHERE a.user_id IS NOT NULL AND u.id IS NULL");
 }
 
 function seed_default_admin($conn) {
@@ -377,6 +465,66 @@ function sync_default_package_prices($conn) {
             $order = $index + 1;
             $feature_stmt->bind_param("isi", $package_id, $feature, $order);
             $feature_stmt->execute();
+        }
+    }
+}
+
+function seed_default_services($conn) {
+    $services = [
+        ['name' => 'Sound', 'description' => 'Sound system and audio support.', 'sort_order' => 1],
+        ['name' => 'Decoration', 'description' => 'Venue decoration and styling.', 'sort_order' => 2],
+        ['name' => 'Lights', 'description' => 'Lighting setup and effects.', 'sort_order' => 3],
+    ];
+
+    $stmt = $conn->prepare("
+        INSERT INTO service_options (name, description, sort_order)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            description = VALUES(description),
+            sort_order = VALUES(sort_order),
+            is_active = 1
+    ");
+
+    foreach ($services as $service) {
+        $stmt->bind_param("ssi", $service['name'], $service['description'], $service['sort_order']);
+        $stmt->execute();
+    }
+}
+
+function sync_normalized_services($conn) {
+    $reservation_stmt = $conn->prepare("
+        INSERT IGNORE INTO reservation_services (reservation_id, service_id)
+        VALUES (?, ?)
+    ");
+    $result = $conn->query("SELECT id, services FROM reservations WHERE services IS NOT NULL AND services<>''");
+
+    while ($row = $result->fetch_assoc()) {
+        $reservation_id = (int) $row['id'];
+
+        foreach (eventify_service_names_from_value($row['services']) as $service_name) {
+            $service_id = eventify_service_option_id($conn, $service_name);
+            if ($service_id > 0) {
+                $reservation_stmt->bind_param("ii", $reservation_id, $service_id);
+                $reservation_stmt->execute();
+            }
+        }
+    }
+
+    $event_stmt = $conn->prepare("
+        INSERT IGNORE INTO event_services (event_id, service_id)
+        VALUES (?, ?)
+    ");
+    $result = $conn->query("SELECT id, services FROM events WHERE services IS NOT NULL AND services<>''");
+
+    while ($row = $result->fetch_assoc()) {
+        $event_id = (int) $row['id'];
+
+        foreach (eventify_service_names_from_value($row['services']) as $service_name) {
+            $service_id = eventify_service_option_id($conn, $service_name);
+            if ($service_id > 0) {
+                $event_stmt->bind_param("ii", $event_id, $service_id);
+                $event_stmt->execute();
+            }
         }
     }
 }

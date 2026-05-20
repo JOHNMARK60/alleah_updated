@@ -5,14 +5,72 @@ include '../config/db.php';
 eventify_require_role('client');
 
 $user_id = eventify_current_user_id();
+
+if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['payment_action'] ?? '') === 'submit_payment') {
+    $reservation_id = (int) ($_POST['reservation_id'] ?? 0);
+    $amount = (float) ($_POST['amount'] ?? 0);
+    $method = trim($_POST['method'] ?? '');
+    $reference_number = trim($_POST['reference_number'] ?? '');
+
+    if(!eventify_verify_csrf()) {
+        eventify_set_flash('error', 'Payment failed', 'Security check failed. Please try again.');
+    } else {
+        $stmt = $conn->prepare("SELECT * FROM reservations WHERE id=? AND user_id=? LIMIT 1");
+        $stmt->bind_param("ii", $reservation_id, $user_id);
+        $stmt->execute();
+        $reservation = $stmt->get_result()->fetch_assoc();
+
+        if(!$reservation) {
+            eventify_set_flash('error', 'Payment failed', 'Reservation was not found.');
+        } elseif(strtolower($reservation['status']) !== 'approved') {
+            eventify_set_flash('error', 'Payment unavailable', 'Payments can be submitted after admin approval.');
+        } elseif($amount <= 0) {
+            eventify_set_flash('error', 'Payment failed', 'Payment amount must be greater than zero.');
+        } elseif(!in_array($method, eventify_payment_methods(), true)) {
+            eventify_set_flash('error', 'Payment failed', 'Please select a valid payment method.');
+        } else {
+            $summary = eventify_reservation_payment_summary($conn, $reservation_id, (float) $reservation['budget']);
+
+            if($summary['payable_amount'] <= 0) {
+                eventify_set_flash('success', 'Payment already covered', 'This reservation has no remaining payable balance.');
+            } elseif($amount > $summary['payable_amount'] + 0.01) {
+                eventify_set_flash('error', 'Payment failed', 'Payment amount is higher than the remaining payable balance.');
+            } else {
+                $status = 'For Review';
+                $stmt = $conn->prepare("
+                    INSERT INTO payments (reservation_id, amount, method, reference_number, status)
+                    VALUES (?, ?, ?, ?, ?)
+                ");
+                $stmt->bind_param("idsss", $reservation_id, $amount, $method, $reference_number, $status);
+                $stmt->execute();
+
+                eventify_create_notification(
+                    $conn,
+                    null,
+                    'admin',
+                    'Payment submitted',
+                    $reservation['client_name'] . ' submitted a payment for ' . $reservation['event_name'] . '.'
+                );
+                eventify_log_activity($conn, 'payment.submitted', 'Reservation #' . $reservation_id);
+                eventify_set_flash('success', 'Payment submitted', 'Admin will verify your payment record.');
+            }
+        }
+    }
+
+    header("Location: my_reservations.php");
+    exit();
+}
+
 $stmt = $conn->prepare("SELECT * FROM reservations WHERE user_id=? ORDER BY id DESC");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 $reservations = [];
+$paymentSummaries = [];
 $activeBookings = 0;
 $waitlisted = 0;
 $totalSpent = 0;
+$totalPaid = 0;
 $today = date('Y-m-d');
 
 while($row = $result->fetch_assoc()){
@@ -28,6 +86,12 @@ while($row = $result->fetch_assoc()){
     }
 
     $totalSpent += (float) $row['budget'];
+}
+
+foreach($reservations as $reservation) {
+    $summary = eventify_reservation_payment_summary($conn, (int) $reservation['id'], (float) $reservation['budget']);
+    $paymentSummaries[(int) $reservation['id']] = $summary;
+    $totalPaid += $summary['verified_amount'];
 }
 
 function reservation_badge_class($status) {
@@ -103,6 +167,8 @@ function reservation_badge_class($status) {
                         <?php
                         $isPast = $row['event_date'] < $today;
                         $image = eventify_package_image_for_reservation($row['event_type'] ?? '', $row['package_type'] ?? '');
+                        $paymentSummary = $paymentSummaries[(int) $row['id']] ?? eventify_reservation_payment_summary($conn, (int) $row['id'], (float) $row['budget']);
+                        $canSubmitPayment = strtolower($row['status']) === 'approved' && $paymentSummary['payable_amount'] > 0;
                         ?>
                         <article class="reservation-card <?php echo $isPast ? 'hidden' : ''; ?> rounded-[2rem] bg-white p-5 shadow-soft" data-reservation-group="<?php echo $isPast ? 'past' : 'upcoming'; ?>">
                             <img class="h-48 w-full rounded-2xl object-cover <?php echo $isPast ? 'grayscale' : ''; ?>" src="<?php echo $image; ?>" alt="Event reservation">
@@ -116,6 +182,54 @@ function reservation_badge_class($status) {
                             <div class="mt-4 grid grid-cols-2 gap-4 text-sm text-slate-600">
                                 <p><span class="block font-semibold text-dark">Date</span><?php echo htmlspecialchars($row['event_date']); ?></p>
                                 <p><span class="block font-semibold text-dark">Venue</span><?php echo htmlspecialchars($row['venue']); ?></p>
+                            </div>
+
+                            <div class="mt-4 rounded-2xl bg-indigo-50 p-4 text-sm">
+                                <div class="flex items-center justify-between gap-3">
+                                    <span class="font-bold text-dark">Payment</span>
+                                    <span class="rounded-full px-3 py-1 text-xs font-semibold <?php echo eventify_payment_status_class($paymentSummary['label']); ?>">
+                                        <?php echo htmlspecialchars($paymentSummary['label']); ?>
+                                    </span>
+                                </div>
+                                <div class="mt-3 grid grid-cols-2 gap-3 text-slate-600">
+                                    <p><span class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Verified</span>&#8369;<?php echo number_format($paymentSummary['verified_amount'], 2); ?></p>
+                                    <p><span class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Balance</span>&#8369;<?php echo number_format($paymentSummary['balance_amount'], 2); ?></p>
+                                </div>
+                                <?php if($paymentSummary['review_amount'] > 0): ?>
+                                    <p class="mt-3 rounded-xl bg-amber-50 px-3 py-2 font-semibold text-amber-700">
+                                        &#8369;<?php echo number_format($paymentSummary['review_amount'], 2); ?> waiting for admin verification.
+                                    </p>
+                                <?php endif; ?>
+                                <?php if($canSubmitPayment): ?>
+                                    <details class="mt-3">
+                                        <summary class="cursor-pointer rounded-xl bg-white px-4 py-3 font-semibold text-primary hover:bg-purple-50">Submit Payment</summary>
+                                        <form method="POST" action="my_reservations.php" class="mt-3 grid gap-3" data-loading-form>
+                                            <?php echo eventify_csrf_field(); ?>
+                                            <input type="hidden" name="payment_action" value="submit_payment">
+                                            <input type="hidden" name="reservation_id" value="<?php echo (int) $row['id']; ?>">
+                                            <div>
+                                                <label class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Amount</label>
+                                                <input type="number" name="amount" min="1" max="<?php echo htmlspecialchars(number_format($paymentSummary['payable_amount'], 2, '.', ''), ENT_QUOTES); ?>" step="0.01" required class="mt-2 w-full rounded-xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
+                                            </div>
+                                            <div>
+                                                <label class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Method</label>
+                                                <select name="method" required class="mt-2 w-full rounded-xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
+                                                    <option value="">Select Method</option>
+                                                    <?php foreach(eventify_payment_methods() as $method): ?>
+                                                        <option value="<?php echo htmlspecialchars($method, ENT_QUOTES); ?>"><?php echo htmlspecialchars($method); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Reference Number</label>
+                                                <input type="text" name="reference_number" maxlength="120" placeholder="Receipt or transaction number" class="mt-2 w-full rounded-xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
+                                            </div>
+                                            <button type="submit" class="rounded-xl bg-primary px-4 py-3 font-semibold text-white">Send for Verification</button>
+                                        </form>
+                                    </details>
+                                <?php elseif(strtolower($row['status']) !== 'approved'): ?>
+                                    <p class="mt-3 text-xs font-semibold text-slate-500">Payment opens after admin approval.</p>
+                                <?php endif; ?>
                             </div>
 
                             <div class="mt-6 flex items-center gap-3">
@@ -171,6 +285,7 @@ function reservation_badge_class($status) {
                     <div class="mt-5 space-y-4 text-sm">
                         <div class="flex justify-between"><span>Active Bookings</span><strong><?php echo str_pad($activeBookings, 2, '0', STR_PAD_LEFT); ?></strong></div>
                         <div class="flex justify-between"><span>Waitlisted</span><strong><?php echo str_pad($waitlisted, 2, '0', STR_PAD_LEFT); ?></strong></div>
+                        <div class="flex justify-between"><span>Verified Payments</span><strong class="text-emerald-600">&#8369;<?php echo number_format((float) $totalPaid, 2); ?></strong></div>
                         <div class="border-t border-purple-100 pt-4 flex justify-between"><span>Total Spent</span><strong class="text-primary">&#8369;<?php echo number_format((float) $totalSpent, 2); ?></strong></div>
                     </div>
                 </section>

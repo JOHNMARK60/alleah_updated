@@ -55,6 +55,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reservation_action']))
                     $res['services']
                 );
                 $stmt->execute();
+                $event_id = (int) $conn->insert_id;
+                eventify_sync_event_services($conn, $event_id, $res['services']);
 
                 $stmt = $conn->prepare("UPDATE reservations SET status='Approved', approved_at=NOW(), rejected_at=NULL, cancelled_at=NULL WHERE id=?");
                 $stmt->bind_param("i", $id);
@@ -204,6 +206,7 @@ function reservation_status_class($status) {
                     <div class="flex flex-wrap items-center gap-3">
                         <?php echo eventify_notification_widget($conn, 'admin'); ?>
                         <input type="search" data-table-search data-table-target="reservationsTable" placeholder="Search reservations" class="rounded-2xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
+                        <a href="payments.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Payments</a>
                     </div>
                 </div>
 
@@ -224,6 +227,7 @@ function reservation_status_class($status) {
                                     <th class="px-6 py-4">Client</th>
                                     <th class="px-6 py-4">Date</th>
                                     <th class="px-6 py-4">Package</th>
+                                    <th class="px-6 py-4">Payment</th>
                                     <th class="px-6 py-4">Status</th>
                                     <th class="px-6 py-4">Actions</th>
                                 </tr>
@@ -231,6 +235,7 @@ function reservation_status_class($status) {
                             <tbody class="divide-y divide-purple-50">
                                 <?php if($result && $result->num_rows > 0): ?>
                                     <?php while($row = $result->fetch_assoc()): ?>
+                                        <?php $paymentSummary = eventify_reservation_payment_summary($conn, (int) $row['id'], (float) $row['budget']); ?>
                                         <tr class="align-top">
                                             <td class="px-6 py-5">
                                                 <p class="font-semibold"><?php echo htmlspecialchars($row['event_name']); ?></p>
@@ -243,6 +248,12 @@ function reservation_status_class($status) {
                                             <td class="px-6 py-5 text-slate-600"><?php echo htmlspecialchars($row['event_date']); ?><br><?php echo htmlspecialchars($row['event_time']); ?></td>
                                             <td class="px-6 py-5 text-slate-600"><?php echo htmlspecialchars($row['package_type']); ?></td>
                                             <td class="px-6 py-5">
+                                                <span class="rounded-full px-3 py-1 text-xs font-semibold <?php echo eventify_payment_status_class($paymentSummary['label']); ?>">
+                                                    <?php echo htmlspecialchars($paymentSummary['label']); ?>
+                                                </span>
+                                                <p class="mt-2 text-xs font-semibold text-slate-500">&#8369;<?php echo number_format($paymentSummary['verified_amount'], 2); ?> paid</p>
+                                            </td>
+                                            <td class="px-6 py-5">
                                                 <span class="rounded-full px-3 py-1 text-xs font-semibold <?php echo reservation_status_class($row['status']); ?>">
                                                     <?php echo htmlspecialchars($row['status']); ?>
                                                 </span>
@@ -254,7 +265,15 @@ function reservation_status_class($status) {
                                                         <div class="absolute z-20 mt-2 w-72 rounded-2xl border border-purple-100 bg-white p-4 shadow-soft">
                                                             <p><strong>Guests:</strong> <?php echo htmlspecialchars($row['guest']); ?></p>
                                                             <p><strong>Budget:</strong> &#8369;<?php echo number_format((float) $row['budget'], 2); ?></p>
+                                                            <p><strong>Payment:</strong> <?php echo htmlspecialchars($paymentSummary['label']); ?></p>
+                                                            <p><strong>Balance:</strong> &#8369;<?php echo number_format($paymentSummary['balance_amount'], 2); ?></p>
                                                             <p><strong>Services:</strong> <?php echo htmlspecialchars(eventify_clean_services($row['services'])); ?></p>
+                                                            <div class="mt-3 flex flex-wrap gap-2">
+                                                                <a href="payments.php?reservation_id=<?php echo (int) $row['id']; ?>" class="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-bold text-primary hover:bg-purple-50">Payments</a>
+                                                                <?php if(strtolower($row['status']) === 'approved'): ?>
+                                                                    <a href="event_records.php?reservation_id=<?php echo (int) $row['id']; ?>" class="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-bold text-primary hover:bg-purple-50">Event Records</a>
+                                                                <?php endif; ?>
+                                                            </div>
                                                         </div>
                                                     </details>
                                                     <?php if(strtolower($row['status']) === 'pending'): ?>
@@ -277,7 +296,7 @@ function reservation_status_class($status) {
                                     <?php endwhile; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td class="px-6 py-8 text-center text-slate-500" colspan="6">No reservations found.</td>
+                                        <td class="px-6 py-8 text-center text-slate-500" colspan="7">No reservations found.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
