@@ -36,13 +36,17 @@ $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $dashboard_modal_recent = $stmt->get_result();
 
-$highlight = $conn->query("
-    SELECT * FROM events
-    WHERE event_date >= CURDATE()
-    ORDER BY event_date ASC
-    LIMIT 1
+$stmt = $conn->prepare("
+    SELECT COUNT(*) AS total, COALESCE(SUM(read_at IS NULL), 0) AS unread
+    FROM admin_client_messages
+    WHERE client_id=?
 ");
-$highlight_event = $highlight ? $highlight->fetch_assoc() : null;
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$message_summary = $stmt->get_result()->fetch_assoc();
+$message_total = (int) ($message_summary['total'] ?? 0);
+$message_unread = (int) ($message_summary['unread'] ?? 0);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -86,6 +90,7 @@ $highlight_event = $highlight ? $highlight->fetch_assoc() : null;
                 <button type="button" data-dashboard-modal-open="reservation" data-modal-target="reservationModal" class="rounded-2xl px-4 py-3 text-left font-bold text-slate-600 hover:bg-purple-50 hover:text-primary">New Reservation</button>
                 <button type="button" data-dashboard-modal-open="reservations" data-modal-target="myReservationsModal" class="rounded-2xl px-4 py-3 text-left font-bold text-slate-600 hover:bg-purple-50 hover:text-primary">My Reservations</button>
                 <button type="button" data-dashboard-modal-open="pricing" data-modal-target="pricingModal" class="rounded-2xl px-4 py-3 text-left font-bold text-slate-600 hover:bg-purple-50 hover:text-primary">Event Pricing</button>
+                <button type="button" data-dashboard-modal-open="messages" data-modal-target="messagesModal" class="rounded-2xl px-4 py-3 text-left font-bold text-slate-600 hover:bg-purple-50 hover:text-primary">Messages</button>
             </nav>
 
             <a href="../auth/logout.php" class="mt-auto rounded-2xl border border-purple-100 px-4 py-3 text-center font-bold text-slate-600 hover:bg-purple-50 hover:text-primary">Logout</a>
@@ -114,10 +119,13 @@ $highlight_event = $highlight ? $highlight->fetch_assoc() : null;
                         <button type="button" data-dashboard-modal-open="reservation" class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-primary to-secondary px-5 py-3 font-semibold text-white shadow-soft">
                             + New Reservation
                         </button>
+                        <button type="button" data-dashboard-modal-open="messages" class="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 font-semibold text-primary shadow-sm hover:bg-purple-50">
+                            Messages
+                        </button>
                     </div>
                 </div>
 
-                <div class="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div class="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                     <button type="button" data-dashboard-modal-open="calendar" class="rounded-3xl bg-white p-6 text-left shadow-soft transition hover:-translate-y-0.5">
                         <span class="grid h-12 w-12 place-items-center rounded-2xl bg-violet-100 font-semibold text-violet-600">C</span>
                         <span class="mt-5 block text-xl font-semibold">Event Calendar</span>
@@ -138,44 +146,14 @@ $highlight_event = $highlight ? $highlight->fetch_assoc() : null;
                         <span class="mt-5 block text-xl font-semibold">Event Pricing</span>
                         <span class="mt-2 block text-sm text-slate-600">Compare available event packages.</span>
                     </button>
+                    <button type="button" data-dashboard-modal-open="messages" class="rounded-3xl bg-white p-6 text-left shadow-soft transition hover:-translate-y-0.5">
+                        <span class="grid h-12 w-12 place-items-center rounded-2xl bg-sky-100 font-semibold text-sky-600">M</span>
+                        <span class="mt-5 block text-xl font-semibold">Messages</span>
+                        <span class="mt-2 block text-sm text-slate-600"><?php echo $message_unread; ?> unread, <?php echo $message_total; ?> total admin message<?php echo $message_total === 1 ? '' : 's'; ?>.</span>
+                    </button>
                 </div>
 
-                <div class="mt-8 grid gap-5 md:grid-cols-3">
-                    <article class="rounded-3xl bg-white p-6 shadow-soft">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Total Reservations</p>
-                                <p class="mt-3 text-5xl font-semibold"><?php echo $my_reservations; ?></p>
-                            </div>
-                            <span class="grid h-12 w-12 place-items-center rounded-2xl bg-purple-100 font-semibold text-primary">R</span>
-                        </div>
-                        <p class="mt-5 text-sm font-bold text-emerald-600">8% since last month</p>
-                    </article>
-
-                    <article class="rounded-3xl bg-white p-6 shadow-soft">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Upcoming Events</p>
-                                <p class="mt-3 text-5xl font-semibold"><?php echo $upcoming; ?></p>
-                            </div>
-                            <span class="grid h-12 w-12 place-items-center rounded-2xl bg-violet-100 font-semibold text-violet-600">C</span>
-                        </div>
-                        <p class="mt-5 text-sm text-slate-600">Next event is shown below.</p>
-                    </article>
-
-                    <article class="rounded-3xl bg-white p-6 shadow-soft">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Completed</p>
-                                <p class="mt-3 text-5xl font-semibold"><?php echo $completed; ?></p>
-                            </div>
-                            <span class="grid h-12 w-12 place-items-center rounded-2xl bg-indigo-100 font-semibold text-indigo-600">OK</span>
-                        </div>
-                        <p class="mt-5 text-sm font-bold text-primary">100% satisfaction focus</p>
-                    </article>
-                </div>
-
-                <div class="mt-8 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+                <div class="mt-8">
                     <section class="rounded-3xl bg-white shadow-soft">
                         <div class="flex items-center justify-between border-b border-purple-100 p-6">
                             <h2 class="text-2xl font-semibold">Recent Activity</h2>
@@ -201,43 +179,17 @@ $highlight_event = $highlight ? $highlight->fetch_assoc() : null;
                             <?php endif; ?>
                         </div>
                     </section>
-
-                    <aside class="space-y-6">
-                        <article class="relative overflow-hidden rounded-3xl bg-dark p-6 text-white shadow-soft">
-                            <img class="absolute inset-0 h-full w-full object-cover opacity-35" src="https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&w=900&q=80" alt="Event highlight">
-                            <div class="relative min-h-64 content-end">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-white/70">Upcoming Highlight</p>
-                                <?php if($highlight_event): ?>
-                                    <h3 class="mt-3 text-2xl font-semibold"><?php echo htmlspecialchars($highlight_event['event_name']); ?></h3>
-                                    <p class="mt-3 text-sm text-white/80"><?php echo htmlspecialchars($highlight_event['event_date']); ?> | <?php echo htmlspecialchars($highlight_event['venue']); ?></p>
-                                <?php else: ?>
-                                    <h3 class="mt-3 text-2xl font-semibold">Plan your next event</h3>
-                                    <p class="mt-3 text-sm text-white/80">No upcoming event is scheduled yet.</p>
-                                <?php endif; ?>
-                            </div>
-                        </article>
-
-                        <article class="rounded-3xl bg-white p-6 shadow-soft">
-                            <div class="flex items-center justify-between">
-                                <h2 class="font-semibold">Event Locations</h2>
-                                <span class="font-semibold text-primary">Map</span>
-                            </div>
-                            <div class="mt-5 h-44 rounded-2xl bg-gradient-to-br from-slate-500 to-slate-700 p-6 text-white">
-                                <div class="mx-auto mt-8 h-20 w-20 rounded-full bg-rose-300 shadow-soft"></div>
-                                <div class="mx-auto -mt-12 h-5 w-5 rounded-full bg-primary ring-4 ring-white"></div>
-                            </div>
-                        </article>
-                    </aside>
                 </div>
             </section>
 
             <!-- Mobile bottom navigation -->
-            <nav class="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-5 border-t border-purple-100 bg-white px-2 py-2 text-center text-xs font-bold text-slate-500 lg:hidden">
+            <nav class="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-6 border-t border-purple-100 bg-white px-2 py-2 text-center text-xs font-bold text-slate-500 lg:hidden">
                 <button type="button" data-dashboard-modal-open="dashboard" data-modal-target="dashboardModal" class="rounded-2xl px-2 py-2 text-primary">Home</button>
                 <button type="button" data-dashboard-modal-open="calendar" data-modal-target="calendarModal" class="rounded-2xl px-2 py-2">Events</button>
                 <button type="button" data-dashboard-modal-open="reservation" data-modal-target="reservationModal" class="-mt-6 mx-auto grid h-14 w-14 place-items-center rounded-full bg-primary text-2xl text-white shadow-soft">+</button>
                 <button type="button" data-dashboard-modal-open="reservations" data-modal-target="myReservationsModal" class="rounded-2xl px-2 py-2">Bookings</button>
                 <button type="button" data-dashboard-modal-open="pricing" data-modal-target="pricingModal" class="rounded-2xl px-2 py-2">Pricing</button>
+                <button type="button" data-dashboard-modal-open="messages" data-modal-target="messagesModal" class="rounded-2xl px-2 py-2">Messages</button>
             </nav>
         </main>
     </div>
@@ -254,6 +206,7 @@ $highlight_event = $highlight ? $highlight->fetch_assoc() : null;
                 <button type="button" data-dashboard-modal-open="reservation" data-modal-target="reservationModal" class="rounded-2xl px-4 py-3 text-left font-bold text-slate-600 hover:bg-purple-50">New Reservation</button>
                 <button type="button" data-dashboard-modal-open="reservations" data-modal-target="myReservationsModal" class="rounded-2xl px-4 py-3 text-left font-bold text-slate-600 hover:bg-purple-50">My Reservations</button>
                 <button type="button" data-dashboard-modal-open="pricing" data-modal-target="pricingModal" class="rounded-2xl px-4 py-3 text-left font-bold text-slate-600 hover:bg-purple-50">Event Pricing</button>
+                <button type="button" data-dashboard-modal-open="messages" data-modal-target="messagesModal" class="rounded-2xl px-4 py-3 text-left font-bold text-slate-600 hover:bg-purple-50">Messages</button>
                 <a href="../auth/logout.php" class="rounded-2xl px-4 py-3 font-bold text-slate-600 hover:bg-purple-50">Logout</a>
             </nav>
         </aside>
@@ -455,6 +408,23 @@ $highlight_event = $highlight ? $highlight->fetch_assoc() : null;
                 Loading reservations...
             </div>
             <div data-reservations-content></div>
+        </div>
+    </div>
+
+    <div id="messagesModal" class="dashboard-modal fixed inset-0 z-50 hidden overflow-y-auto bg-dark/60 p-4 backdrop-blur-sm" data-dashboard-modal="messages" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="messagesModalTitle" tabindex="-1">
+        <div class="dashboard-modal-panel mx-auto my-6 w-full max-w-6xl rounded-[2rem] bg-white p-5 shadow-soft sm:p-8" data-modal-panel>
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Client Inbox</p>
+                    <h2 id="messagesModalTitle" class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Messages</h2>
+                </div>
+                <button type="button" class="rounded-xl px-3 py-2 font-semibold text-primary hover:bg-purple-50" data-dashboard-modal-close>Close</button>
+            </div>
+
+            <div class="mt-6 rounded-2xl bg-indigo-50 p-5 text-center text-sm font-semibold text-primary" data-messages-loading>
+                Loading messages...
+            </div>
+            <div data-messages-content></div>
         </div>
     </div>
 

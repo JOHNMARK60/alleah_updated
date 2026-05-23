@@ -37,7 +37,7 @@ In short, Eventify uses OOP principles to keep the system organized around clear
 | `index.php` | Redirects users to the homepage. |
 | `homepage/` | Public landing page, package showcase, gallery, login/register links, images, videos, CSS, and JavaScript. |
 | `auth/` | Login, registration, logout, and authentication UI assets. |
-| `client/` | Client dashboard, reservations, calendar, payments, notifications, and reservation editing. |
+| `client/` | Client dashboard, reservations, calendar, payments, notifications, message inbox, and reservation editing. |
 | `admin/` | Admin dashboard, reservation approval, package management, gallery management, payments, users, calendar, event records, and manual event creation. |
 | `config/db.php` | Database connection, automatic database/table creation, schema upgrades, default seed data, and foreign keys. |
 | `config/helpers.php` | Shared helper functions for validation, CSRF, packages, services, notifications, payments, activity logs, and conflict checking. |
@@ -74,6 +74,7 @@ Clients can:
 - Submit payments after reservation approval.
 - View payment status and balance.
 - Receive notifications from admin actions.
+- View a saved admin message inbox.
 - View client calendar and approved events.
 
 ### Admin
@@ -90,6 +91,7 @@ Admins can:
 - Upload package images.
 - Upload, show/hide, and delete gallery photos.
 - View users.
+- Send direct messages or concern updates to clients.
 - View admin calendar.
 - Add manual events.
 - Review, verify, or reject client payment submissions.
@@ -186,10 +188,19 @@ Notifications are created for:
 - Payment submission.
 - Payment verification.
 - Payment rejection.
+- Admin direct messages to clients.
 
 Users can mark notifications as read from the notification widget.
 
-### 10. Calendars
+### 10. Admin Messages
+
+1. Admin opens `admin/messages.php`.
+2. Admin selects a client, enters a subject, and writes the concern or update.
+3. The sent message is stored in `admin_client_messages`.
+4. The client receives the message through the notification widget.
+5. The client can also open `client/messages.php` to review the saved message history.
+
+### 11. Calendars
 
 The system includes client and admin calendars.
 
@@ -231,6 +242,7 @@ Main tables:
 - `event_services`
 - `payments`
 - `notifications`
+- `admin_client_messages`
 - `reservation_status_history`
 - `reservation_items`
 - `event_logs`
@@ -323,6 +335,7 @@ http://alleah11.test/
 | `client/dashboard.php` | Client dashboard. |
 | `client/reservation.php` | Create reservation. |
 | `client/my_reservations.php` | View reservations and submit payments. |
+| `client/messages.php` | View saved admin messages. |
 | `client/edit_reservation.php` | Edit pending reservation. |
 | `client/calendar.php` | Client calendar. |
 | `admin/dashboard.php` | Admin dashboard. |
@@ -331,6 +344,7 @@ http://alleah11.test/
 | `admin/packages.php` | Manage event packages. |
 | `admin/gallery.php` | Manage homepage gallery photos. |
 | `admin/users.php` | View users. |
+| `admin/messages.php` | Send concern/update messages to clients. |
 | `admin/calendar.php` | Admin calendar. |
 | `admin/add_event.php` | Add manual event. |
 | `admin/event_records.php` | Manage event timeline records. |

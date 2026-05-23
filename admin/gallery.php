@@ -179,6 +179,7 @@ $gallery_photos = eventify_get_gallery_photos($conn);
                 <a href="packages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Packages</a>
                 <a href="gallery.php" class="rounded-2xl bg-white/10 px-4 py-3 font-bold text-white">Gallery</a>
                 <a href="users.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Users</a>
+                <a href="messages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Messages</a>
                 <a href="calendar.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Calendar</a>
                 <a href="add_event.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Add Event</a>
             </nav>

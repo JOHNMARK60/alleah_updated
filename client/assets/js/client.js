@@ -9,6 +9,7 @@ let activeModal = null;
 let previousFocus = null;
 let calendarLoaded = false;
 let reservationsLoaded = false;
+let messagesLoaded = false;
 let calendarState = {
     events: [],
     displayDate: new Date(),
@@ -205,6 +206,10 @@ async function openModal(modalId) {
     if (modalId === "reservations") {
         await loadReservationsContent();
     }
+
+    if (modalId === "messages") {
+        await loadMessagesContent();
+    }
 }
 
 function openPricingModal() {
@@ -324,6 +329,45 @@ async function loadReservationsContent(force = false) {
     } catch (error) {
         content.innerHTML = `<div class="mt-6 rounded-[2rem] bg-red-50 p-8 text-center text-red-700">
             <h3 class="text-2xl font-semibold">Reservations unavailable</h3>
+            <p class="mt-2">Please try again in a moment.</p>
+        </div>`;
+    } finally {
+        loading?.classList.add("hidden");
+        content.classList.remove("opacity-50");
+    }
+}
+
+async function loadMessagesContent(force = false) {
+    const content = document.querySelector("[data-messages-content]");
+    const loading = document.querySelector("[data-messages-loading]");
+
+    if (!content) {
+        return;
+    }
+
+    if (messagesLoaded && !force) {
+        return;
+    }
+
+    loading?.classList.remove("hidden");
+    content.classList.add("opacity-50");
+
+    try {
+        const html = await fetchText("messages.php");
+        const parsed = new DOMParser().parseFromString(html, "text/html");
+        const messageBlock = parsed.querySelector("[data-messages-history]");
+
+        content.innerHTML = messageBlock
+            ? messageBlock.outerHTML
+            : `<div class="mt-6 rounded-[2rem] bg-indigo-50 p-8 text-center">
+                <h3 class="text-2xl font-semibold">No messages yet</h3>
+                <p class="mt-2 text-slate-600">Admin messages will appear here after they are sent.</p>
+            </div>`;
+
+        messagesLoaded = true;
+    } catch (error) {
+        content.innerHTML = `<div class="mt-6 rounded-[2rem] bg-red-50 p-8 text-center text-red-700">
+            <h3 class="text-2xl font-semibold">Messages unavailable</h3>
             <p class="mt-2">Please try again in a moment.</p>
         </div>`;
     } finally {

@@ -108,6 +108,7 @@ function admin_badge_class($status) {
                 <a href="packages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Packages</a>
                 <a href="gallery.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Gallery</a>
                 <a href="users.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Users</a>
+                <a href="messages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Messages</a>
                 <a href="calendar.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Calendar</a>
                 <a href="add_event.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Add Event</a>
             </nav>
@@ -136,6 +137,7 @@ function admin_badge_class($status) {
                         <?php echo eventify_notification_widget($conn, 'admin'); ?>
                         <input type="search" data-table-search data-table-target="recentReservations" placeholder="Search recent reservations" class="rounded-2xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
                         <a href="reservations.php?filter=pending" class="rounded-2xl bg-gradient-to-r from-primary to-secondary px-5 py-3 text-center font-semibold text-white shadow-soft">Review Pending</a>
+                        <a href="messages.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Messages</a>
                         <a href="payments.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Payments</a>
                         <a href="event_records.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Event Records</a>
                     </div>
@@ -271,6 +273,7 @@ function admin_badge_class($status) {
                 <a href="packages.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Packages</a>
                 <a href="gallery.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Gallery</a>
                 <a href="users.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Users</a>
+                <a href="messages.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Messages</a>
                 <a href="calendar.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Calendar</a>
                 <a href="../auth/logout.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Logout</a>
             </nav>

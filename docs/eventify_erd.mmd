@@ -1,6 +1,7 @@
 erDiagram
     USERS ||--o{ RESERVATIONS : creates
     USERS ||--o{ NOTIFICATIONS : receives
+    USERS ||--o{ ADMIN_CLIENT_MESSAGES : sends_or_receives
     USERS ||--o{ ACTIVITY_LOGS : performs
     USERS ||--o{ EVENT_LOGS : records
 
@@ -158,6 +159,16 @@ erDiagram
         varchar title
         text message
         tinyint is_read
+        timestamp created_at
+    }
+
+    ADMIN_CLIENT_MESSAGES {
+        int id PK
+        int admin_id FK
+        int client_id FK
+        varchar subject
+        text message
+        datetime read_at
         timestamp created_at
     }
 

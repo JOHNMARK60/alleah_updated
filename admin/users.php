@@ -55,6 +55,7 @@ $users = $stmt->get_result();
                 <a href="packages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Packages</a>
                 <a href="gallery.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Gallery</a>
                 <a href="users.php" class="rounded-2xl bg-white/10 px-4 py-3 font-bold text-white">Users</a>
+                <a href="messages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Messages</a>
                 <a href="calendar.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Calendar</a>
             </nav>
             <a href="../auth/logout.php" class="mt-auto rounded-2xl border border-white/10 px-4 py-3 text-center font-bold text-white/75 hover:bg-white/10">Logout</a>
@@ -70,6 +71,7 @@ $users = $stmt->get_result();
                     <div class="flex flex-wrap items-center gap-3">
                         <?php echo eventify_notification_widget($conn, 'admin'); ?>
                         <input type="search" data-table-search data-table-target="usersTable" placeholder="Search users" class="rounded-2xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
+                        <a href="messages.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Messages</a>
                     </div>
                 </div>
 
@@ -84,6 +86,7 @@ $users = $stmt->get_result();
                                     <th class="px-6 py-4">Email</th>
                                     <th class="px-6 py-4">Contact</th>
                                     <th class="px-6 py-4">Role</th>
+                                    <th class="px-6 py-4">Action</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-purple-50">
@@ -98,11 +101,18 @@ $users = $stmt->get_result();
                                             <td class="px-6 py-4">
                                                 <span class="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-primary"><?php echo htmlspecialchars($row['role']); ?></span>
                                             </td>
+                                            <td class="px-6 py-4">
+                                                <?php if($row['role'] === 'client'): ?>
+                                                    <a href="messages.php?client_id=<?php echo (int) $row['id']; ?>" class="font-semibold text-primary">Message</a>
+                                                <?php else: ?>
+                                                    <span class="text-slate-400">-</span>
+                                                <?php endif; ?>
+                                            </td>
                                         </tr>
                                     <?php endwhile; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td class="px-6 py-8 text-center text-slate-500" colspan="6">No users found.</td>
+                                        <td class="px-6 py-8 text-center text-slate-500" colspan="7">No users found.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>

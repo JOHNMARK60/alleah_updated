@@ -95,6 +95,22 @@ try {
     ");
 
     $conn->query("
+        CREATE TABLE IF NOT EXISTS admin_client_messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            admin_id INT DEFAULT NULL,
+            client_id INT DEFAULT NULL,
+            subject VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            read_at DATETIME DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_admin_client_messages_admin_id (admin_id),
+            INDEX idx_admin_client_messages_client_id (client_id),
+            INDEX idx_admin_client_messages_read_at (read_at),
+            INDEX idx_admin_client_messages_created_at (created_at)
+        )
+    ");
+
+    $conn->query("
         CREATE TABLE IF NOT EXISTS event_packages (
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(120) NOT NULL,
@@ -278,6 +294,7 @@ function upgrade_eventify_schema($conn) {
     eventify_ensure_column($conn, 'events', 'package_id', 'INT DEFAULT NULL AFTER client_contact');
     eventify_ensure_varchar_length($conn, 'reservations', 'package_type', 120);
     eventify_ensure_varchar_length($conn, 'events', 'package_type', 120);
+    eventify_ensure_column($conn, 'admin_client_messages', 'read_at', 'DATETIME DEFAULT NULL AFTER message');
 
     eventify_ensure_column_index($conn, 'users', 'email', 'idx_users_email');
     eventify_ensure_column_index($conn, 'users', 'role', 'idx_users_role');
@@ -292,6 +309,10 @@ function upgrade_eventify_schema($conn) {
     eventify_ensure_column_index($conn, 'notifications', 'user_id', 'idx_notifications_user_id');
     eventify_ensure_column_index($conn, 'notifications', 'role', 'idx_notifications_role');
     eventify_ensure_column_index($conn, 'notifications', 'is_read', 'idx_notifications_is_read');
+    eventify_ensure_column_index($conn, 'admin_client_messages', 'admin_id', 'idx_admin_client_messages_admin_id');
+    eventify_ensure_column_index($conn, 'admin_client_messages', 'client_id', 'idx_admin_client_messages_client_id');
+    eventify_ensure_column_index($conn, 'admin_client_messages', 'read_at', 'idx_admin_client_messages_read_at');
+    eventify_ensure_column_index($conn, 'admin_client_messages', 'created_at', 'idx_admin_client_messages_created_at');
     eventify_ensure_column_index($conn, 'event_gallery_photos', 'is_active', 'idx_gallery_active');
     eventify_ensure_column_index($conn, 'reservation_status_history', 'changed_by', 'idx_status_history_changed_by');
     eventify_ensure_column_index($conn, 'reservation_items', 'package_id', 'idx_reservation_items_package_id');
@@ -305,6 +326,8 @@ function upgrade_eventify_schema($conn) {
     eventify_ensure_foreign_key($conn, 'events', 'fk_events_reservation', 'FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`id`) ON DELETE SET NULL');
     eventify_ensure_foreign_key($conn, 'events', 'fk_events_package', 'FOREIGN KEY (`package_id`) REFERENCES `event_packages`(`id`) ON DELETE SET NULL');
     eventify_ensure_foreign_key($conn, 'notifications', 'fk_notifications_user', 'FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'admin_client_messages', 'fk_admin_client_messages_admin', 'FOREIGN KEY (`admin_id`) REFERENCES `users`(`id`) ON DELETE SET NULL');
+    eventify_ensure_foreign_key($conn, 'admin_client_messages', 'fk_admin_client_messages_client', 'FOREIGN KEY (`client_id`) REFERENCES `users`(`id`) ON DELETE SET NULL');
     eventify_ensure_foreign_key($conn, 'reservation_status_history', 'fk_status_history_reservation', 'FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`id`) ON DELETE CASCADE');
     eventify_ensure_foreign_key($conn, 'reservation_status_history', 'fk_status_history_changed_by', 'FOREIGN KEY (`changed_by`) REFERENCES `users`(`id`) ON DELETE SET NULL');
     eventify_ensure_foreign_key($conn, 'reservation_items', 'fk_reservation_items_reservation', 'FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`id`) ON DELETE CASCADE');
@@ -326,6 +349,8 @@ function prepare_eventify_foreign_key_data($conn) {
     $conn->query("UPDATE events e LEFT JOIN reservations r ON r.id = e.reservation_id SET e.reservation_id = NULL WHERE e.reservation_id IS NOT NULL AND r.id IS NULL");
     $conn->query("UPDATE events e LEFT JOIN event_packages p ON p.id = e.package_id SET e.package_id = NULL WHERE e.package_id IS NOT NULL AND p.id IS NULL");
     $conn->query("UPDATE notifications n LEFT JOIN users u ON u.id = n.user_id SET n.user_id = NULL WHERE n.user_id IS NOT NULL AND u.id IS NULL");
+    $conn->query("UPDATE admin_client_messages m LEFT JOIN users u ON u.id = m.admin_id SET m.admin_id = NULL WHERE m.admin_id IS NOT NULL AND u.id IS NULL");
+    $conn->query("UPDATE admin_client_messages m LEFT JOIN users u ON u.id = m.client_id SET m.client_id = NULL WHERE m.client_id IS NOT NULL AND u.id IS NULL");
     $conn->query("DELETE h FROM reservation_status_history h LEFT JOIN reservations r ON r.id = h.reservation_id WHERE r.id IS NULL");
     $conn->query("UPDATE reservation_status_history h LEFT JOIN users u ON u.id = h.changed_by SET h.changed_by = NULL WHERE h.changed_by IS NOT NULL AND u.id IS NULL");
     $conn->query("DELETE i FROM reservation_items i LEFT JOIN reservations r ON r.id = i.reservation_id WHERE r.id IS NULL");

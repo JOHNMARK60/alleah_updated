@@ -4,7 +4,7 @@
 
 Database name: `registration_event`
 
-Eventify uses a relational database for users, reservations, approved events, packages, payments, notifications, gallery photos, and event records. The implemented design now includes primary keys, foreign keys, and junction tables for multi-value services.
+Eventify uses a relational database for users, reservations, approved events, packages, payments, notifications, admin-to-client messages, gallery photos, and event records. The implemented design now includes primary keys, foreign keys, and junction tables for multi-value services.
 
 ## Main Entities
 
@@ -22,6 +22,7 @@ Eventify uses a relational database for users, reservations, approved events, pa
 | `reservation_status_history` | `id` | Stores reservation status changes. |
 | `event_logs` | `id` | Stores event records/timeline notes. |
 | `notifications` | `id` | Stores admin/client notifications. |
+| `admin_client_messages` | `id` | Stores direct messages sent by admins to clients, including client read state. |
 | `activity_logs` | `id` | Stores user activity audit logs. |
 | `reservation_items` | `id` | Stores line items for a reservation. |
 | `event_gallery_photos` | `id` | Stores gallery images for packages/categories. |
@@ -44,6 +45,8 @@ Eventify uses a relational database for users, reservations, approved events, pa
 | `service_options.id` to `event_services.service_id` | One service can be used in many events. |
 | `events.id` to `event_logs.event_id` | One event can have many records/timeline notes. |
 | `users.id` to `notifications.user_id` | One user can receive many notifications. |
+| `users.id` to `admin_client_messages.admin_id` | One admin can send many client messages. |
+| `users.id` to `admin_client_messages.client_id` | One client can receive many admin messages. |
 | `users.id` to `activity_logs.user_id` | One user can create many activity logs. |
 | `users.id` to `event_logs.created_by` | One admin/user can create many event records. |
 
@@ -82,6 +85,7 @@ Applied in Eventify:
 - Services are stored in `service_options`, while service selections are stored in junction tables.
 - Payment data is separate from reservation data in `payments`.
 - Event timeline data is separate from event data in `event_logs`.
+- Direct admin-to-client message history is separate from transient notification read state.
 - Status history is separate from the current reservation status in `reservation_status_history`.
 
 Controlled snapshot fields:
@@ -99,7 +103,7 @@ Open phpMyAdmin:
 
 Recommended manual layout:
 
-- Left: `users`, `notifications`, `activity_logs`
+- Left: `users`, `notifications`, `admin_client_messages`, `activity_logs`
 - Center: `reservations`
 - Right: `events`, `event_logs`
 - Top: `event_packages`, `package_features`

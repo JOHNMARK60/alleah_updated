@@ -8,7 +8,7 @@ System Overview
 Main User Roles
 - Public Visitor: Can view the homepage, packages, and login/register modal.
 - Client: Can access the client dashboard, submit reservations, view booking status, check the event calendar, and cancel reservations.
-- Admin: Can access the admin dashboard, review reservation requests, approve or reject bookings, view users, manage calendar events, and manually add events.
+- Admin: Can access the admin dashboard, review reservation requests, approve or reject bookings, view users, send client messages, manage calendar events, and manually add events.
 
 Homepage Features
 - Landing page for Eventify branding and event management promotion.
@@ -72,6 +72,10 @@ Client Features
   - Today button
   - Free/Full availability labels
   - Approved event details by selected date
+- Client messages page with:
+  - Saved admin messages
+  - Unread/new message indicators
+  - Message read tracking
 - Responsive client navigation with desktop sidebar, mobile header, and mobile bottom navigation.
 
 Admin Features
@@ -97,6 +101,8 @@ Admin Features
   - User list
   - ID, name, username, email, contact, and role columns
   - Search field
+- Messages page where admins can send concerns or updates to selected clients.
+- Client message delivery uses the notification widget.
 - Admin calendar with:
   - Approved events
   - Monthly navigation
@@ -147,4 +153,3 @@ Suggested Priority Improvements
 - Priority 3: Add double-booking prevention for date, time, and venue.
 - Priority 4: Improve reservation editing, status tracking, and notifications.
 - Priority 5: Add reporting, package management, pagination, and reusable layout components.
-  

@@ -31,7 +31,8 @@ INSERT INTO phpmyadmin.pma__table_coords (db_name, table_name, pdf_page_number, 
 -- Users and audit trail.
 (@eventify_db_name, 'users', @eventify_page_nr, 60, 420),
 (@eventify_db_name, 'notifications', @eventify_page_nr, 60, 720),
-(@eventify_db_name, 'activity_logs', @eventify_page_nr, 60, 980),
+(@eventify_db_name, 'admin_client_messages', @eventify_page_nr, 60, 980),
+(@eventify_db_name, 'activity_logs', @eventify_page_nr, 60, 1240),
 
 -- Package and gallery setup.
 (@eventify_db_name, 'event_packages', @eventify_page_nr, 460, 40),

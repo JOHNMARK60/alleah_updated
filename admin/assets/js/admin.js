@@ -115,7 +115,10 @@ document.querySelectorAll("form[data-confirm-form]").forEach((form) => {
 });
 
 document.querySelectorAll("form[data-loading-form]").forEach((form) => {
-    form.addEventListener("submit", () => setFormLoading(form));
+    form.addEventListener("submit", (event) => {
+        preserveSubmitterValue(form, event.submitter);
+        setFormLoading(form);
+    });
 });
 
 const adminCalendarGrid = document.getElementById("adminCalendarGrid");
@@ -246,6 +249,19 @@ function setFormLoading(form) {
         button.textContent = "Please wait...";
         button.classList.add("opacity-70", "cursor-not-allowed");
     });
+}
+
+function preserveSubmitterValue(form, submitter) {
+    if (!submitter || !submitter.name) {
+        return;
+    }
+
+    const hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = submitter.name;
+    hidden.value = submitter.value || "";
+    hidden.dataset.submitterProxy = "true";
+    form.appendChild(hidden);
 }
 
 function formatDate(date) {
