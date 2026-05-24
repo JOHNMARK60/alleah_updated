@@ -90,6 +90,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                 <a href="dashboard.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Dashboard</a>
                 <a href="reservations.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Reservations</a>
                 <a href="packages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Packages</a>
+                <a href="reports.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Sales Reports</a>
                 <a href="gallery.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Gallery</a>
                 <a href="users.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Users</a>
                 <a href="messages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Messages</a>
@@ -100,6 +101,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         </aside>
 
         <main class="flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+            <?php echo eventify_admin_mobile_header($conn, 'add_event'); ?>
             <div class="mx-auto max-w-5xl">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -195,6 +197,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             </div>
         </main>
     </div>
+
+    <?php echo eventify_admin_mobile_sidebar('add_event'); ?>
     <?php echo eventify_package_price_script($conn); ?>
     <?php echo eventify_sweetalert_flash(); ?>
     <script src="assets/js/admin.js"></script>

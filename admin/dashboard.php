@@ -96,7 +96,7 @@ function admin_badge_class($status) {
 </head>
 <body class="bg-soft text-dark">
     <div class="min-h-screen lg:flex">
-        <aside class="hidden w-72 shrink-0 flex-col border-r border-purple-100 bg-dark p-6 text-white lg:flex">
+        <aside class="hidden shrink-0 flex-col border-r border-purple-100 bg-dark p-6 text-white lg:flex lg:w-64 xl:w-72">
             <a href="dashboard.php" class="flex items-center gap-3 text-2xl font-semibold">
                 <span class="grid h-10 w-10 place-items-center rounded-2xl bg-primary">E</span>
                 Eventify Admin
@@ -105,18 +105,21 @@ function admin_badge_class($status) {
             <nav class="mt-10 grid gap-2">
                 <a href="dashboard.php" class="rounded-2xl bg-white/10 px-4 py-3 font-bold text-white">Dashboard</a>
                 <a href="reservations.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Reservations</a>
+                <a href="reports.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Sales Reports</a>
+                <a href="payments.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Payments</a>
                 <a href="packages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Packages</a>
                 <a href="gallery.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Gallery</a>
                 <a href="users.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Users</a>
                 <a href="messages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Messages</a>
                 <a href="calendar.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Calendar</a>
                 <a href="add_event.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Add Event</a>
+                <a href="event_records.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Event Records</a>
             </nav>
 
             <a href="../auth/logout.php" class="mt-auto rounded-2xl border border-white/10 px-4 py-3 text-center font-bold text-white/75 hover:bg-white/10 hover:text-white">Logout</a>
         </aside>
 
-        <main class="flex-1">
+        <main class="min-w-0 flex-1 overflow-x-hidden">
             <header class="sticky top-0 z-30 flex items-center justify-between border-b border-purple-100 bg-white/90 px-4 py-4 backdrop-blur lg:hidden">
                 <button type="button" class="rounded-xl p-2 text-primary" data-admin-sidebar-button aria-label="Open navigation">
                     <span class="block h-0.5 w-6 bg-current"></span>
@@ -128,22 +131,23 @@ function admin_badge_class($status) {
             </header>
 
             <section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
+                <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
+                    <div class="min-w-0">
                         <p class="text-sm font-semibold uppercase tracking-[0.25em] text-primary">Admin Overview</p>
                         <h1 class="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Dashboard</h1>
                     </div>
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div class="flex w-full min-w-0 flex-wrap items-center gap-3 2xl:w-auto 2xl:justify-end">
                         <?php echo eventify_notification_widget($conn, 'admin'); ?>
-                        <input type="search" data-table-search data-table-target="recentReservations" placeholder="Search recent reservations" class="rounded-2xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
+                        <input type="search" data-table-search data-table-target="recentReservations" placeholder="Search reservations" class="min-w-0 flex-1 rounded-2xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100 sm:min-w-[16rem] 2xl:w-64 2xl:flex-none">
                         <a href="reservations.php?filter=pending" class="rounded-2xl bg-gradient-to-r from-primary to-secondary px-5 py-3 text-center font-semibold text-white shadow-soft">Review Pending</a>
+                        <a href="reports.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Reports</a>
                         <a href="messages.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Messages</a>
                         <a href="payments.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Payments</a>
                         <a href="event_records.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Event Records</a>
                     </div>
                 </div>
 
-                <div class="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="mt-8 grid gap-5 sm:grid-cols-2 2xl:grid-cols-4">
                     <article class="rounded-3xl bg-white p-6 shadow-soft">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Total Reservations</p>
                         <p class="mt-4 text-5xl font-semibold"><?php echo $total_reservations; ?></p>
@@ -262,7 +266,7 @@ function admin_badge_class($status) {
     </div>
 
     <div class="fixed inset-0 z-40 hidden bg-dark/50 lg:hidden" data-admin-sidebar>
-        <aside class="h-full w-80 bg-dark p-6 text-white shadow-soft">
+        <aside class="h-full w-80 max-w-[86vw] overflow-y-auto bg-dark p-6 text-white shadow-soft">
             <div class="flex items-center justify-between">
                 <span class="text-2xl font-semibold">Eventify Admin</span>
                 <button type="button" class="rounded-xl px-3 py-2 font-semibold text-white" data-admin-sidebar-close>Close</button>
@@ -270,11 +274,15 @@ function admin_badge_class($status) {
             <nav class="mt-8 grid gap-2">
                 <a href="dashboard.php" class="rounded-2xl bg-white/10 px-4 py-3 font-bold">Dashboard</a>
                 <a href="reservations.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Reservations</a>
+                <a href="reports.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Sales Reports</a>
+                <a href="payments.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Payments</a>
                 <a href="packages.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Packages</a>
                 <a href="gallery.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Gallery</a>
                 <a href="users.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Users</a>
                 <a href="messages.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Messages</a>
                 <a href="calendar.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Calendar</a>
+                <a href="add_event.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Add Event</a>
+                <a href="event_records.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Event Records</a>
                 <a href="../auth/logout.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10">Logout</a>
             </nav>
         </aside>

@@ -160,6 +160,7 @@ if ($editing) {
                 <a href="dashboard.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Dashboard</a>
                 <a href="reservations.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Reservations</a>
                 <a href="packages.php" class="rounded-2xl bg-white/10 px-4 py-3 font-bold text-white">Packages</a>
+                <a href="reports.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Sales Reports</a>
                 <a href="gallery.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Gallery</a>
                 <a href="users.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Users</a>
                 <a href="messages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10">Messages</a>
@@ -170,6 +171,7 @@ if ($editing) {
         </aside>
 
         <main class="flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+            <?php echo eventify_admin_mobile_header($conn, 'packages'); ?>
             <div class="mx-auto max-w-7xl">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
@@ -265,6 +267,8 @@ if ($editing) {
             </div>
         </main>
     </div>
+
+    <?php echo eventify_admin_mobile_sidebar('packages'); ?>
 
     <?php echo eventify_sweetalert_flash(); ?>
     <script src="assets/js/admin.js"></script>

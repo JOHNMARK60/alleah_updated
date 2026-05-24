@@ -187,6 +187,7 @@ function reservation_status_class($status) {
             <nav class="mt-10 grid gap-2">
                 <a href="dashboard.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Dashboard</a>
                 <a href="reservations.php" class="rounded-2xl bg-white/10 px-4 py-3 font-bold text-white">Reservations</a>
+                <a href="reports.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Sales Reports</a>
                 <a href="packages.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Packages</a>
                 <a href="gallery.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Gallery</a>
                 <a href="users.php" class="rounded-2xl px-4 py-3 font-bold text-white/70 hover:bg-white/10 hover:text-white">Users</a>
@@ -198,6 +199,7 @@ function reservation_status_class($status) {
         </aside>
 
         <main class="flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+            <?php echo eventify_admin_mobile_header($conn, 'reservations'); ?>
             <div class="mx-auto max-w-7xl">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
@@ -207,6 +209,7 @@ function reservation_status_class($status) {
                     <div class="flex flex-wrap items-center gap-3">
                         <?php echo eventify_notification_widget($conn, 'admin'); ?>
                         <input type="search" data-table-search data-table-target="reservationsTable" placeholder="Search reservations" class="rounded-2xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
+                        <a href="reports.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Reports</a>
                         <a href="payments.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Payments</a>
                     </div>
                 </div>
@@ -317,6 +320,8 @@ function reservation_status_class($status) {
             </div>
         </main>
     </div>
+
+    <?php echo eventify_admin_mobile_sidebar('reservations'); ?>
 
     <?php echo eventify_sweetalert_flash(); ?>
     <script src="assets/js/admin.js"></script>

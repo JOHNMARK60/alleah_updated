@@ -26,6 +26,7 @@ try {
             username VARCHAR(100) NOT NULL,
             email VARCHAR(150) NOT NULL UNIQUE,
             contact VARCHAR(30) NOT NULL,
+            address VARCHAR(255) DEFAULT NULL,
             password VARCHAR(255) NOT NULL,
             role VARCHAR(20) NOT NULL DEFAULT 'client',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -280,6 +281,8 @@ try {
 }
 
 function upgrade_eventify_schema($conn) {
+    eventify_ensure_column($conn, 'users', 'address', 'VARCHAR(255) DEFAULT NULL AFTER contact');
+
     eventify_ensure_column($conn, 'reservations', 'user_id', 'INT DEFAULT NULL AFTER id');
     eventify_ensure_column($conn, 'reservations', 'booking_reference', 'VARCHAR(32) DEFAULT NULL AFTER user_id');
     eventify_ensure_column($conn, 'reservations', 'end_time', 'TIME DEFAULT NULL AFTER event_time');

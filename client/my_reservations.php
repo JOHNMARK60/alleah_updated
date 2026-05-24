@@ -6,6 +6,89 @@ eventify_require_role('client');
 
 $user_id = eventify_current_user_id();
 
+if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['profile_action'] ?? '') === 'update_profile') {
+    $name = trim($_POST['name'] ?? '');
+    $username = trim($_POST['username'] ?? '');
+    $email = strtolower(trim($_POST['email'] ?? ''));
+    $contact = trim($_POST['contact'] ?? '');
+    $address = trim($_POST['address'] ?? '');
+    $errors = [];
+
+    if(!eventify_verify_csrf()) {
+        $errors[] = 'Security check failed. Please try again.';
+    }
+
+    if($name === '' || strlen($name) > 100 || !preg_match("/^[A-Za-z .'-]+$/", $name)) {
+        $errors[] = 'Please enter a valid full name.';
+    }
+
+    if($username === '' || strlen($username) > 100) {
+        $errors[] = 'Please enter a valid username.';
+    }
+
+    if($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 150) {
+        $errors[] = 'Please enter a valid email address.';
+    }
+
+    if($contact === '' || !eventify_valid_contact($contact)) {
+        $errors[] = 'Please enter a valid contact number.';
+    }
+
+    if(strlen($address) > 255) {
+        $errors[] = 'Address must be 255 characters or fewer.';
+    }
+
+    if(empty($errors)) {
+        $stmt = $conn->prepare("SELECT id FROM users WHERE email=? AND id<>? LIMIT 1");
+        $stmt->bind_param("si", $email, $user_id);
+        $stmt->execute();
+
+        if($stmt->get_result()->fetch_assoc()) {
+            $errors[] = 'That email address is already used by another account.';
+        }
+    }
+
+    if(empty($errors)) {
+        try {
+            $conn->begin_transaction();
+
+            $stmt = $conn->prepare("
+                UPDATE users
+                SET name=?, username=?, email=?, contact=?, address=?
+                WHERE id=? AND role='client'
+            ");
+            $stmt->bind_param("sssssi", $name, $username, $email, $contact, $address, $user_id);
+            $stmt->execute();
+
+            $stmt = $conn->prepare("UPDATE reservations SET client_name=?, client_contact=? WHERE user_id=?");
+            $stmt->bind_param("ssi", $name, $contact, $user_id);
+            $stmt->execute();
+
+            $stmt = $conn->prepare("
+                UPDATE events e
+                INNER JOIN reservations r ON r.id = e.reservation_id
+                SET e.client_name=?, e.client_contact=?
+                WHERE r.user_id=?
+            ");
+            $stmt->bind_param("ssi", $name, $contact, $user_id);
+            $stmt->execute();
+
+            eventify_log_activity($conn, 'profile.updated', 'Client profile updated.');
+            $conn->commit();
+
+            eventify_set_flash('success', 'Profile updated', 'Your personal information was saved.');
+        } catch (mysqli_sql_exception $error) {
+            $conn->rollback();
+            eventify_set_flash('error', 'Profile update failed', 'Please try again.');
+        }
+    } else {
+        eventify_set_flash('error', 'Profile update failed', $errors[0]);
+    }
+
+    header("Location: my_reservations.php#profile");
+    exit();
+}
+
 if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['payment_action'] ?? '') === 'submit_payment') {
     $reservation_id = (int) ($_POST['reservation_id'] ?? 0);
     $amount = (float) ($_POST['amount'] ?? 0);
@@ -58,6 +141,17 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['payment_action'] ?? '') ===
     }
 
     header("Location: my_reservations.php");
+    exit();
+}
+
+$stmt = $conn->prepare("SELECT id, name, username, email, contact, address, created_at FROM users WHERE id=? AND role='client' LIMIT 1");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$currentUser = $stmt->get_result()->fetch_assoc();
+
+if(!$currentUser) {
+    eventify_set_flash('error', 'Account unavailable', 'Please sign in again.');
+    header("Location: ../auth/login.php");
     exit();
 }
 
@@ -153,6 +247,7 @@ function reservation_badge_class($status) {
             <p class="text-sm font-semibold uppercase tracking-[0.25em] text-primary">Bookings</p>
             <h1 class="mt-2 text-4xl font-semibold tracking-tight sm:text-6xl">My Reservations</h1>
             <p class="mt-4 text-lg leading-8 text-slate-600">Manage upcoming event experiences, review status updates, and view booking details.</p>
+            <a href="#profile" class="mt-5 inline-flex rounded-2xl bg-white px-5 py-3 font-semibold text-primary shadow-sm hover:bg-purple-50">Edit Profile</a>
         </div>
 
         <div class="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -280,6 +375,50 @@ function reservation_badge_class($status) {
             </section>
 
             <aside class="space-y-6">
+                <section id="profile" class="rounded-[2rem] bg-white p-6 shadow-soft">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Personal Information</p>
+                            <h2 class="mt-2 text-2xl font-semibold"><?php echo htmlspecialchars($currentUser['name']); ?></h2>
+                        </div>
+                    </div>
+                    <div class="mt-5 space-y-3 text-sm text-slate-600">
+                        <p><span class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Username</span><?php echo htmlspecialchars($currentUser['username']); ?></p>
+                        <p><span class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Email</span><?php echo htmlspecialchars($currentUser['email']); ?></p>
+                        <p><span class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Contact</span><?php echo htmlspecialchars($currentUser['contact']); ?></p>
+                        <p><span class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Address</span><?php echo htmlspecialchars($currentUser['address'] ?: 'Not specified'); ?></p>
+                    </div>
+
+                    <details class="mt-5">
+                        <summary class="cursor-pointer rounded-2xl bg-primary px-5 py-3 text-center font-semibold text-white shadow-soft">Edit Personal Information</summary>
+                        <form method="POST" action="my_reservations.php#profile" class="mt-5 grid gap-4" data-loading-form>
+                            <?php echo eventify_csrf_field(); ?>
+                            <input type="hidden" name="profile_action" value="update_profile">
+                            <div>
+                                <label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Full Name</label>
+                                <input type="text" name="name" maxlength="100" required value="<?php echo htmlspecialchars($currentUser['name'], ENT_QUOTES); ?>" class="mt-2 w-full rounded-xl border border-purple-100 bg-indigo-50 px-4 py-3 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Username</label>
+                                <input type="text" name="username" maxlength="100" required value="<?php echo htmlspecialchars($currentUser['username'], ENT_QUOTES); ?>" class="mt-2 w-full rounded-xl border border-purple-100 bg-indigo-50 px-4 py-3 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Email Address</label>
+                                <input type="email" name="email" maxlength="150" required value="<?php echo htmlspecialchars($currentUser['email'], ENT_QUOTES); ?>" class="mt-2 w-full rounded-xl border border-purple-100 bg-indigo-50 px-4 py-3 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contact Number</label>
+                                <input type="text" name="contact" maxlength="30" pattern="[0-9+\-\s()]{7,20}" required value="<?php echo htmlspecialchars($currentUser['contact'], ENT_QUOTES); ?>" class="mt-2 w-full rounded-xl border border-purple-100 bg-indigo-50 px-4 py-3 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-purple-100">
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Address</label>
+                                <textarea name="address" maxlength="255" rows="3" class="mt-2 w-full rounded-xl border border-purple-100 bg-indigo-50 px-4 py-3 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-purple-100"><?php echo htmlspecialchars($currentUser['address'] ?? '', ENT_QUOTES); ?></textarea>
+                            </div>
+                            <button type="submit" class="rounded-xl bg-gradient-to-r from-primary to-secondary px-5 py-3 font-semibold text-white shadow-soft">Save Profile</button>
+                        </form>
+                    </details>
+                </section>
+
                 <section class="rounded-[2rem] bg-white p-6 shadow-soft">
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Reservation Summary</p>
                     <div class="mt-5 space-y-4 text-sm">

@@ -452,6 +452,61 @@ function eventify_current_user_id() {
     return (int) ($_SESSION['user_id'] ?? 0);
 }
 
+function eventify_admin_nav_items() {
+    return [
+        ['key' => 'dashboard', 'label' => 'Dashboard', 'url' => 'dashboard.php'],
+        ['key' => 'reservations', 'label' => 'Reservations', 'url' => 'reservations.php'],
+        ['key' => 'reports', 'label' => 'Sales Reports', 'url' => 'reports.php'],
+        ['key' => 'payments', 'label' => 'Payments', 'url' => 'payments.php'],
+        ['key' => 'packages', 'label' => 'Packages', 'url' => 'packages.php'],
+        ['key' => 'gallery', 'label' => 'Gallery', 'url' => 'gallery.php'],
+        ['key' => 'users', 'label' => 'Users', 'url' => 'users.php'],
+        ['key' => 'messages', 'label' => 'Messages', 'url' => 'messages.php'],
+        ['key' => 'calendar', 'label' => 'Calendar', 'url' => 'calendar.php'],
+        ['key' => 'add_event', 'label' => 'Add Event', 'url' => 'add_event.php'],
+        ['key' => 'event_records', 'label' => 'Event Records', 'url' => 'event_records.php'],
+    ];
+}
+
+function eventify_admin_mobile_header($conn, $active_key = 'dashboard') {
+    ob_start();
+    ?>
+    <header class="no-print sticky top-0 z-30 -mx-4 -mt-8 mb-6 flex items-center justify-between border-b border-purple-100 bg-white/95 px-4 py-4 backdrop-blur sm:-mx-6 lg:hidden">
+        <button type="button" class="rounded-xl p-2 text-primary" data-admin-sidebar-button aria-label="Open navigation">
+            <span class="block h-0.5 w-6 bg-current"></span>
+            <span class="mt-1.5 block h-0.5 w-6 bg-current"></span>
+            <span class="mt-1.5 block h-0.5 w-6 bg-current"></span>
+        </button>
+        <a href="dashboard.php" class="text-xl font-semibold">Eventify</a>
+        <?php echo eventify_notification_widget($conn, 'admin'); ?>
+    </header>
+    <?php
+    return ob_get_clean();
+}
+
+function eventify_admin_mobile_sidebar($active_key = 'dashboard') {
+    ob_start();
+    ?>
+    <div class="no-print fixed inset-0 z-40 hidden bg-dark/50 lg:hidden" data-admin-sidebar>
+        <aside class="h-full w-80 max-w-[86vw] overflow-y-auto bg-dark p-6 text-white shadow-soft">
+            <div class="flex items-center justify-between gap-4">
+                <span class="text-2xl font-semibold">Eventify Admin</span>
+                <button type="button" class="rounded-xl px-3 py-2 font-semibold text-white" data-admin-sidebar-close>Close</button>
+            </div>
+            <nav class="mt-8 grid gap-2">
+                <?php foreach(eventify_admin_nav_items() as $item): ?>
+                    <a href="<?php echo htmlspecialchars($item['url'], ENT_QUOTES); ?>" class="rounded-2xl px-4 py-3 font-bold <?php echo $active_key === $item['key'] ? 'bg-white/10 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'; ?>">
+                        <?php echo htmlspecialchars($item['label']); ?>
+                    </a>
+                <?php endforeach; ?>
+                <a href="../auth/logout.php" class="rounded-2xl px-4 py-3 font-bold text-white/75 hover:bg-white/10 hover:text-white">Logout</a>
+            </nav>
+        </aside>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
 function eventify_valid_contact($contact) {
     return (bool) preg_match('/^[0-9+\-\s()]{7,20}$/', $contact);
 }
