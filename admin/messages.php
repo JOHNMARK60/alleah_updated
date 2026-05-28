@@ -4,36 +4,50 @@ include '../config/db.php';
 
 eventify_require_role('admin');
 
+$current_admin_id = eventify_current_user_id();
 $selected_client_id = (int) ($_GET['client_id'] ?? ($_POST['client_id'] ?? 0));
 $form_errors = [];
 
-if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['message_action'] ?? '') === 'send_message') {
-    $selected_client_id = (int) ($_POST['client_id'] ?? 0);
+if($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $message_action = $_POST['message_action'] ?? '';
     $subject = trim($_POST['subject'] ?? '');
     $message = trim($_POST['message'] ?? '');
+    $message_id = (int) ($_POST['message_id'] ?? 0);
 
     if(!eventify_verify_csrf()) {
         $form_errors[] = 'Security check failed. Please try again.';
     }
 
-    if($selected_client_id <= 0) {
-        $form_errors[] = 'Please choose a client.';
+    if($message_action === 'send_message') {
+        $selected_client_id = (int) ($_POST['client_id'] ?? 0);
+
+        if($selected_client_id <= 0) {
+            $form_errors[] = 'Please choose a client.';
+        }
     }
 
-    if($subject === '') {
-        $form_errors[] = 'Please enter a subject.';
+    if($message_action === 'send_message' || $message_action === 'edit_message') {
+        if($subject === '') {
+            $form_errors[] = 'Please enter a subject.';
+        }
+
+        if(strlen($subject) > 255) {
+            $form_errors[] = 'Subject must be 255 characters or fewer.';
+        }
+
+        if($message === '') {
+            $form_errors[] = 'Please enter a message.';
+        }
     }
 
-    if(strlen($subject) > 255) {
-        $form_errors[] = 'Subject must be 255 characters or fewer.';
-    }
-
-    if($message === '') {
-        $form_errors[] = 'Please enter a message.';
+    if($message_action === 'edit_message' || $message_action === 'delete_message') {
+        if($message_id <= 0) {
+            $form_errors[] = 'Message was not found.';
+        }
     }
 
     $client = null;
-    if(!$form_errors) {
+    if(!$form_errors && $message_action === 'send_message') {
         $stmt = $conn->prepare("SELECT id, name, email FROM users WHERE id=? AND role='client' LIMIT 1");
         $stmt->bind_param("i", $selected_client_id);
         $stmt->execute();
@@ -44,16 +58,15 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['message_action'] ?? '') ===
         }
     }
 
-    if(!$form_errors) {
+    if(!$form_errors && $message_action === 'send_message') {
         try {
             $conn->begin_transaction();
 
-            $admin_id = eventify_current_user_id();
             $stmt = $conn->prepare("
-                INSERT INTO admin_client_messages (admin_id, client_id, subject, message)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO admin_client_messages (admin_id, client_id, sender_role, subject, message)
+                VALUES (?, ?, 'admin', ?, ?)
             ");
-            $stmt->bind_param("iiss", $admin_id, $selected_client_id, $subject, $message);
+            $stmt->bind_param("iiss", $current_admin_id, $selected_client_id, $subject, $message);
             $stmt->execute();
 
             $notification_title = substr('Admin message: ' . $subject, 0, 255);
@@ -74,6 +87,70 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['message_action'] ?? '') ===
             $conn->rollback();
             $form_errors[] = 'Message could not be sent. Please try again.';
         }
+    } elseif(!$form_errors && $message_action === 'edit_message') {
+        $in_transaction = false;
+        try {
+            $stmt = $conn->prepare("
+                SELECT client_id
+                FROM admin_client_messages
+                WHERE id=? AND admin_id=? AND sender_role='admin'
+                LIMIT 1
+            ");
+            $stmt->bind_param("ii", $message_id, $current_admin_id);
+            $stmt->execute();
+            $owned_message = $stmt->get_result()->fetch_assoc();
+
+            if(!$owned_message) {
+                $form_errors[] = 'Message was not found or could not be edited.';
+            } else {
+                $conn->begin_transaction();
+                $in_transaction = true;
+
+                $stmt = $conn->prepare("
+                    UPDATE admin_client_messages
+                    SET subject=?, message=?, read_at=NULL, edited_at=NOW()
+                    WHERE id=? AND admin_id=? AND sender_role='admin'
+                ");
+                $stmt->bind_param("ssii", $subject, $message, $message_id, $current_admin_id);
+                $stmt->execute();
+
+                $client_id = (int) $owned_message['client_id'];
+                if($client_id > 0) {
+                    $notification_title = substr('Admin message updated: ' . $subject, 0, 255);
+                    eventify_create_notification($conn, $client_id, 'client', $notification_title, $message);
+                }
+
+                eventify_log_activity($conn, 'client.message.updated', 'Admin updated message #' . $message_id . '.');
+                $conn->commit();
+                eventify_set_flash('success', 'Message updated', 'The edited message was sent back to the client inbox.');
+                header("Location: messages.php?client_id=" . $client_id);
+                exit();
+            }
+        } catch (mysqli_sql_exception $error) {
+            if($in_transaction) {
+                $conn->rollback();
+            }
+            $form_errors[] = 'Message could not be edited. Please try again.';
+        }
+    } elseif(!$form_errors && $message_action === 'delete_message') {
+        try {
+            $stmt = $conn->prepare("DELETE FROM admin_client_messages WHERE id=? AND admin_id=? AND sender_role='admin'");
+            $stmt->bind_param("ii", $message_id, $current_admin_id);
+            $stmt->execute();
+
+            if($stmt->affected_rows <= 0) {
+                $form_errors[] = 'Message was not found or could not be deleted.';
+            } else {
+                eventify_log_activity($conn, 'client.message.deleted', 'Admin deleted message #' . $message_id . '.');
+                eventify_set_flash('success', 'Message deleted', 'Your message was deleted.');
+                header("Location: messages.php");
+                exit();
+            }
+        } catch (mysqli_sql_exception $error) {
+            $form_errors[] = 'Message could not be deleted. Please try again.';
+        }
+    } elseif(!$form_errors) {
+        $form_errors[] = 'Message action is invalid.';
     }
 }
 
@@ -84,6 +161,12 @@ $clients = $conn->query("
     ORDER BY name ASC, email ASC
 ");
 
+$incoming_unread_count = (int) $conn->query("
+    SELECT COUNT(*) AS total
+    FROM admin_client_messages
+    WHERE sender_role='client' AND read_at IS NULL
+")->fetch_assoc()['total'];
+
 $recent_messages = $conn->query("
     SELECT m.*, client.name AS client_name, client.email AS client_email, admin.name AS admin_name
     FROM admin_client_messages m
@@ -92,6 +175,10 @@ $recent_messages = $conn->query("
     ORDER BY m.created_at DESC
     LIMIT 20
 ");
+
+if($incoming_unread_count > 0) {
+    $conn->query("UPDATE admin_client_messages SET read_at=NOW() WHERE sender_role='client' AND read_at IS NULL");
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -151,6 +238,10 @@ $recent_messages = $conn->query("
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <?php echo eventify_notification_widget($conn, 'admin'); ?>
+                        <div class="rounded-2xl bg-white px-5 py-3 text-center shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">New client messages</p>
+                            <p class="text-2xl font-semibold text-primary"><?php echo $incoming_unread_count; ?></p>
+                        </div>
                         <a href="users.php" class="rounded-2xl bg-white px-5 py-3 text-center font-semibold text-primary shadow-sm hover:bg-purple-50">Client List</a>
                     </div>
                 </div>
@@ -164,7 +255,7 @@ $recent_messages = $conn->query("
                 <div class="mt-8 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
                     <section class="rounded-[2rem] bg-white p-6 shadow-soft">
                         <p class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Compose</p>
-                        <h2 class="mt-1 text-2xl font-semibold">Send Client Message</h2>
+                        <h2 class="mt-1 text-2xl font-semibold">Send or Reply to Client</h2>
 
                         <form method="POST" class="mt-6 grid gap-5" data-loading-form>
                             <?php echo eventify_csrf_field(); ?>
@@ -190,7 +281,7 @@ $recent_messages = $conn->query("
 
                             <div>
                                 <label class="text-sm font-bold text-slate-600">Message</label>
-                                <textarea name="message" rows="8" required placeholder="Write the concern or instructions for the client." class="mt-2 w-full rounded-xl border border-purple-100 bg-indigo-50 px-4 py-4 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-purple-100"><?php echo htmlspecialchars($_POST['message'] ?? ''); ?></textarea>
+                                <textarea name="message" rows="8" required placeholder="Write the concern, instructions, or reply for the client." class="mt-2 w-full rounded-xl border border-purple-100 bg-indigo-50 px-4 py-4 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-purple-100"><?php echo htmlspecialchars($_POST['message'] ?? ''); ?></textarea>
                             </div>
 
                             <button type="submit" class="rounded-2xl bg-gradient-to-r from-primary to-secondary px-6 py-4 font-semibold text-white shadow-soft">
@@ -202,22 +293,34 @@ $recent_messages = $conn->query("
                     <section class="overflow-hidden rounded-[2rem] bg-white shadow-soft">
                         <div class="border-b border-purple-100 p-6">
                             <p class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">History</p>
-                            <h2 class="mt-1 text-2xl font-semibold">Recently Sent</h2>
+                            <h2 class="mt-1 text-2xl font-semibold">Recent Conversation</h2>
                         </div>
                         <div class="divide-y divide-purple-50">
                             <?php if($recent_messages && $recent_messages->num_rows > 0): ?>
                                 <?php while($row = $recent_messages->fetch_assoc()): ?>
-                                    <article class="p-6">
+                                    <?php
+                                    $is_from_client = ($row['sender_role'] ?? 'admin') === 'client';
+                                    $was_unread = $is_from_client && empty($row['read_at']);
+                                    $can_manage_message = !$is_from_client && (int) ($row['admin_id'] ?? 0) === $current_admin_id;
+                                    ?>
+                                    <article class="p-6 <?php echo $was_unread ? 'bg-purple-50/60' : 'bg-white'; ?>">
                                         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                             <div>
                                                 <div class="flex flex-wrap items-center gap-2">
                                                     <h3 class="text-lg font-semibold"><?php echo htmlspecialchars($row['subject']); ?></h3>
-                                                    <span class="rounded-full px-3 py-1 text-xs font-semibold <?php echo empty($row['read_at']) ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'; ?>">
-                                                        <?php echo empty($row['read_at']) ? 'Unread' : 'Read'; ?>
+                                                    <span class="rounded-full px-3 py-1 text-xs font-semibold <?php echo $is_from_client ? 'bg-sky-100 text-sky-700' : 'bg-primary text-white'; ?>">
+                                                        <?php echo $is_from_client ? 'From Client' : 'Sent by Admin'; ?>
                                                     </span>
+                                                    <?php if($was_unread): ?>
+                                                        <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">New</span>
+                                                    <?php elseif(!$is_from_client): ?>
+                                                        <span class="rounded-full px-3 py-1 text-xs font-semibold <?php echo empty($row['read_at']) ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'; ?>">
+                                                            <?php echo empty($row['read_at']) ? 'Client unread' : 'Client read'; ?>
+                                                        </span>
+                                                    <?php endif; ?>
                                                 </div>
                                                 <p class="mt-1 text-sm font-semibold text-slate-500">
-                                                    To <?php echo htmlspecialchars($row['client_name'] ?: 'Deleted client'); ?>
+                                                    <?php echo $is_from_client ? 'From ' : 'To '; ?><?php echo htmlspecialchars($row['client_name'] ?: 'Deleted client'); ?>
                                                     <?php if(!empty($row['client_email'])): ?>
                                                         <span class="text-slate-400">| <?php echo htmlspecialchars($row['client_email']); ?></span>
                                                     <?php endif; ?>
@@ -226,14 +329,49 @@ $recent_messages = $conn->query("
                                             <p class="shrink-0 text-sm font-semibold text-slate-400"><?php echo htmlspecialchars(date('M d, Y h:i A', strtotime($row['created_at']))); ?></p>
                                         </div>
                                         <p class="mt-4 whitespace-pre-line text-sm leading-6 text-slate-600"><?php echo htmlspecialchars($row['message']); ?></p>
-                                        <?php if(!empty($row['read_at'])): ?>
-                                            <p class="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Read <?php echo htmlspecialchars(date('M d, Y h:i A', strtotime($row['read_at']))); ?></p>
+                                        <div class="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.2em]">
+                                            <?php if($is_from_client): ?>
+                                                <p class="<?php echo $was_unread ? 'text-primary' : 'text-slate-400'; ?>">
+                                                    <?php echo $was_unread ? 'Marked read after opening admin inbox' : 'Admin read ' . htmlspecialchars(date('M d, Y h:i A', strtotime($row['read_at']))); ?>
+                                                </p>
+                                                <?php if(!empty($row['client_id'])): ?>
+                                                    <a href="messages.php?client_id=<?php echo (int) $row['client_id']; ?>" class="text-primary">Reply</a>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <p class="<?php echo empty($row['read_at']) ? 'text-amber-600' : 'text-emerald-600'; ?>">
+                                                    <?php echo empty($row['read_at']) ? 'Waiting for client to read' : 'Client read ' . htmlspecialchars(date('M d, Y h:i A', strtotime($row['read_at']))); ?>
+                                                </p>
+                                                <p class="text-slate-400">Sent by <?php echo htmlspecialchars($row['admin_name'] ?: 'Admin'); ?></p>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php if(!empty($row['edited_at'])): ?>
+                                            <p class="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Edited <?php echo htmlspecialchars(date('M d, Y h:i A', strtotime($row['edited_at']))); ?></p>
                                         <?php endif; ?>
-                                        <p class="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Sent by <?php echo htmlspecialchars($row['admin_name'] ?: 'Admin'); ?></p>
+                                        <?php if($can_manage_message): ?>
+                                            <div class="mt-5 grid gap-3 rounded-2xl border border-purple-100 bg-indigo-50 p-4">
+                                                <details>
+                                                    <summary class="cursor-pointer text-sm font-bold text-primary">Edit message</summary>
+                                                    <form method="POST" class="mt-4 grid gap-3" data-loading-form>
+                                                        <?php echo eventify_csrf_field(); ?>
+                                                        <input type="hidden" name="message_action" value="edit_message">
+                                                        <input type="hidden" name="message_id" value="<?php echo (int) $row['id']; ?>">
+                                                        <input type="text" name="subject" maxlength="255" required value="<?php echo htmlspecialchars($row['subject'], ENT_QUOTES); ?>" class="w-full rounded-xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100">
+                                                        <textarea name="message" rows="4" required class="w-full rounded-xl border border-purple-100 bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-purple-100"><?php echo htmlspecialchars($row['message']); ?></textarea>
+                                                        <button type="submit" class="rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white">Save Changes</button>
+                                                    </form>
+                                                </details>
+                                                <form method="POST" data-confirm-form data-confirm-message="Delete this message?">
+                                                    <?php echo eventify_csrf_field(); ?>
+                                                    <input type="hidden" name="message_action" value="delete_message">
+                                                    <input type="hidden" name="message_id" value="<?php echo (int) $row['id']; ?>">
+                                                    <button type="submit" class="text-sm font-bold text-red-600">Delete message</button>
+                                                </form>
+                                            </div>
+                                        <?php endif; ?>
                                     </article>
                                 <?php endwhile; ?>
                             <?php else: ?>
-                                <div class="p-8 text-center text-slate-500">No admin messages sent yet.</div>
+                                <div class="p-8 text-center text-slate-500">No messages yet.</div>
                             <?php endif; ?>
                         </div>
                     </section>

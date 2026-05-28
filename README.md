@@ -74,7 +74,7 @@ Clients can:
 - Submit payments after reservation approval.
 - View payment status and balance.
 - Receive notifications from admin actions.
-- View a saved admin message inbox.
+- Send messages to admins, edit/delete their own sent messages, and view the saved conversation history.
 - View client calendar and approved events.
 
 ### Admin
@@ -92,6 +92,8 @@ Admins can:
 - Upload, show/hide, and delete gallery photos.
 - View users.
 - Send direct messages or concern updates to clients.
+- Edit or delete messages they personally sent.
+- Receive and reply to direct client messages.
 - View admin calendar.
 - Add manual events.
 - Review, verify, or reject client payment submissions.
@@ -189,16 +191,20 @@ Notifications are created for:
 - Payment verification.
 - Payment rejection.
 - Admin direct messages to clients.
+- Client direct messages to admins.
 
 Users can mark notifications as read from the notification widget.
 
-### 10. Admin Messages
+### 10. Direct Messages
 
 1. Admin opens `admin/messages.php`.
 2. Admin selects a client, enters a subject, and writes the concern or update.
 3. The sent message is stored in `admin_client_messages`.
 4. The client receives the message through the notification widget.
-5. The client can also open `client/messages.php` to review the saved message history.
+5. The client can open `client/messages.php` to review the saved message history.
+6. The client can also compose a message to the admin team from `client/messages.php`.
+7. Admin receives a notification and can review or reply from `admin/messages.php`.
+8. Each sender can edit or delete their own sent messages; edited messages are marked unread for the recipient.
 
 ### 11. Calendars
 
@@ -335,7 +341,7 @@ http://alleah11.test/
 | `client/dashboard.php` | Client dashboard. |
 | `client/reservation.php` | Create reservation. |
 | `client/my_reservations.php` | View reservations and submit payments. |
-| `client/messages.php` | View saved admin messages. |
+| `client/messages.php` | Send, edit, delete, and view admin conversation messages. |
 | `client/edit_reservation.php` | Edit pending reservation. |
 | `client/calendar.php` | Client calendar. |
 | `admin/dashboard.php` | Admin dashboard. |
@@ -344,7 +350,7 @@ http://alleah11.test/
 | `admin/packages.php` | Manage event packages. |
 | `admin/gallery.php` | Manage homepage gallery photos. |
 | `admin/users.php` | View users. |
-| `admin/messages.php` | Send concern/update messages to clients. |
+| `admin/messages.php` | Send, receive, reply, edit, and delete owned client messages. |
 | `admin/calendar.php` | Admin calendar. |
 | `admin/add_event.php` | Add manual event. |
 | `admin/event_records.php` | Manage event timeline records. |

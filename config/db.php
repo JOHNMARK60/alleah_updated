@@ -100,12 +100,15 @@ try {
             id INT AUTO_INCREMENT PRIMARY KEY,
             admin_id INT DEFAULT NULL,
             client_id INT DEFAULT NULL,
+            sender_role ENUM('admin','client') NOT NULL DEFAULT 'admin',
             subject VARCHAR(255) NOT NULL,
             message TEXT NOT NULL,
             read_at DATETIME DEFAULT NULL,
+            edited_at DATETIME DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_admin_client_messages_admin_id (admin_id),
             INDEX idx_admin_client_messages_client_id (client_id),
+            INDEX idx_admin_client_messages_sender_role (sender_role),
             INDEX idx_admin_client_messages_read_at (read_at),
             INDEX idx_admin_client_messages_created_at (created_at)
         )
@@ -297,7 +300,9 @@ function upgrade_eventify_schema($conn) {
     eventify_ensure_column($conn, 'events', 'package_id', 'INT DEFAULT NULL AFTER client_contact');
     eventify_ensure_varchar_length($conn, 'reservations', 'package_type', 120);
     eventify_ensure_varchar_length($conn, 'events', 'package_type', 120);
+    eventify_ensure_column($conn, 'admin_client_messages', 'sender_role', "ENUM('admin','client') NOT NULL DEFAULT 'admin' AFTER client_id");
     eventify_ensure_column($conn, 'admin_client_messages', 'read_at', 'DATETIME DEFAULT NULL AFTER message');
+    eventify_ensure_column($conn, 'admin_client_messages', 'edited_at', 'DATETIME DEFAULT NULL AFTER read_at');
 
     eventify_ensure_column_index($conn, 'users', 'email', 'idx_users_email');
     eventify_ensure_column_index($conn, 'users', 'role', 'idx_users_role');
@@ -314,6 +319,7 @@ function upgrade_eventify_schema($conn) {
     eventify_ensure_column_index($conn, 'notifications', 'is_read', 'idx_notifications_is_read');
     eventify_ensure_column_index($conn, 'admin_client_messages', 'admin_id', 'idx_admin_client_messages_admin_id');
     eventify_ensure_column_index($conn, 'admin_client_messages', 'client_id', 'idx_admin_client_messages_client_id');
+    eventify_ensure_column_index($conn, 'admin_client_messages', 'sender_role', 'idx_admin_client_messages_sender_role');
     eventify_ensure_column_index($conn, 'admin_client_messages', 'read_at', 'idx_admin_client_messages_read_at');
     eventify_ensure_column_index($conn, 'admin_client_messages', 'created_at', 'idx_admin_client_messages_created_at');
     eventify_ensure_column_index($conn, 'event_gallery_photos', 'is_active', 'idx_gallery_active');

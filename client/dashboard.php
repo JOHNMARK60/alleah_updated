@@ -37,7 +37,9 @@ $stmt->execute();
 $dashboard_modal_recent = $stmt->get_result();
 
 $stmt = $conn->prepare("
-    SELECT COUNT(*) AS total, COALESCE(SUM(read_at IS NULL), 0) AS unread
+    SELECT
+        COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN sender_role='admin' AND read_at IS NULL THEN 1 ELSE 0 END), 0) AS unread
     FROM admin_client_messages
     WHERE client_id=?
 ");
@@ -149,7 +151,7 @@ $message_unread = (int) ($message_summary['unread'] ?? 0);
                     <button type="button" data-dashboard-modal-open="messages" class="rounded-3xl bg-white p-6 text-left shadow-soft transition hover:-translate-y-0.5">
                         <span class="grid h-12 w-12 place-items-center rounded-2xl bg-sky-100 font-semibold text-sky-600">M</span>
                         <span class="mt-5 block text-xl font-semibold">Messages</span>
-                        <span class="mt-2 block text-sm text-slate-600"><?php echo $message_unread; ?> unread, <?php echo $message_total; ?> total admin message<?php echo $message_total === 1 ? '' : 's'; ?>.</span>
+                        <span class="mt-2 block text-sm text-slate-600"><?php echo $message_unread; ?> unread, <?php echo $message_total; ?> total conversation message<?php echo $message_total === 1 ? '' : 's'; ?>.</span>
                     </button>
                 </div>
 
@@ -415,7 +417,7 @@ $message_unread = (int) ($message_summary['unread'] ?? 0);
         <div class="dashboard-modal-panel mx-auto my-6 w-full max-w-6xl rounded-[2rem] bg-white p-5 shadow-soft sm:p-8" data-modal-panel>
             <div class="flex items-start justify-between gap-4">
                 <div>
-                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Client Inbox</p>
+                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">Client Messages</p>
                     <h2 id="messagesModalTitle" class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Messages</h2>
                 </div>
                 <button type="button" class="rounded-xl px-3 py-2 font-semibold text-primary hover:bg-purple-50" data-dashboard-modal-close>Close</button>

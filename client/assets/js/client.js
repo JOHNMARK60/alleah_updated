@@ -361,7 +361,7 @@ async function loadMessagesContent(force = false) {
             ? messageBlock.outerHTML
             : `<div class="mt-6 rounded-[2rem] bg-indigo-50 p-8 text-center">
                 <h3 class="text-2xl font-semibold">No messages yet</h3>
-                <p class="mt-2 text-slate-600">Admin messages will appear here after they are sent.</p>
+                <p class="mt-2 text-slate-600">Send a message to admin or check back for updates.</p>
             </div>`;
 
         messagesLoaded = true;
